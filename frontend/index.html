@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PitchIQ - Where Data Meets Cricket</title>
+    <link rel="stylesheet" href="styles.css">
+    <!-- Google Fonts: Inter for that sleek modern look -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- tsparticles for futuristic background -->
+    <script src="https://cdn.jsdelivr.net/npm/tsparticles-engine@2/tsparticles.engine.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/tsparticles-basic@2/tsparticles.basic.min.js"></script>
+</head>
+<body>
+    <div id="tsparticles"></div>
+    
+    <header class="glass-panel">
+        <div class="logo">PitchIQ <span>TELEMETRY</span></div>
+        <div class="status-indicator">
+            <span class="pulse"></span> ENGINE ONLINE
+        </div>
+    </header>
+
+    <main class="dashboard">
+        <!-- Controls Panel -->
+        <section class="glass-panel controls">
+            <h2>Match State Input</h2>
+            <div class="input-grid">
+                <div class="input-group">
+                    <label>Current Runs</label>
+                    <input type="number" id="currentRuns" value="120">
+                </div>
+                <div class="input-group">
+                    <label>Wickets Down</label>
+                    <input type="number" id="currentWickets" value="4">
+                </div>
+                <div class="input-group">
+                    <label>Overs Bowled</label>
+                    <input type="number" id="oversBowled" value="15">
+                </div>
+                <div class="input-group">
+                    <label>Balls in Over</label>
+                    <input type="number" id="ballsBowled" value="2">
+                </div>
+                <div class="input-group">
+                    <label>Target Score</label>
+                    <input type="number" id="targetScore" value="185">
+                </div>
+                <div class="input-group">
+                    <label>AI Persona</label>
+                    <select id="personaSelect" style="width:100%; background:rgba(0,0,0,0.3); border:1px solid var(--panel-border); color:var(--accent-blue); padding:10px; border-radius:6px; font-family:'Inter'; outline:none;">
+                        <option value="Analyst">Analyst</option>
+                        <option value="Coach">Coach</option>
+                        <option value="Funny Fan">Funny Fan</option>
+                    </select>
+                </div>
+            </div>
+            <button id="analyzeBtn" class="cyber-button">RUN SIMULATION <span class="arr">&rarr;</span></button>
+        </section>
+
+        <!-- Main HUD (Hidden until simulation runs) -->
+        <section class="hud" id="hud" style="display: none;">
+            
+            <div class="glass-panel stat-card main-stat">
+                <h3>WIN PROBABILITY</h3>
+                <div class="svg-ring-container">
+                    <svg viewBox="0 0 36 36" class="circular-chart blue">
+                        <path class="circle-bg"
+                            d="M18 2.0845
+                            a 15.9155 15.9155 0 0 1 0 31.831
+                            a 15.9155 15.9155 0 0 1 0 -31.831"
+                        />
+                        <path class="circle" id="winProbRing"
+                            stroke-dasharray="0, 100"
+                            d="M18 2.0845
+                            a 15.9155 15.9155 0 0 1 0 31.831
+                            a 15.9155 15.9155 0 0 1 0 -31.831"
+                        />
+                        <text x="18" y="20.35" class="percentage" id="winProbText">0%</text>
+                    </svg>
+                </div>
+            </div>
+
+            <div class="glass-panel stat-card">
+                <h3>PROJECTED SCORE</h3>
+                <div class="big-number" id="projScoreText">0</div>
+                <div class="sub-stat">Expected Runs: <span id="expRunsText">0</span></div>
+            </div>
+
+            <div class="glass-panel stat-card">
+                <h3>REQUIRED RUN RATE</h3>
+                <div class="big-number" id="rrrText">0.00</div>
+                <div class="momentum-bar">
+                    <div class="momentum-fill" id="momentumFill" style="width: 50%;"></div>
+                </div>
+                <div class="sub-stat">Momentum Meter</div>
+            </div>
+
+            <div class="glass-panel ai-panel">
+                <h3>GEMINI AI ANALYSIS</h3>
+                <div class="ai-content">
+                    <p><strong>FACT:</strong> <span id="aiFact">...</span></p>
+                    <p><strong>TACTICAL:</strong> <span id="aiTactical">...</span></p>
+                    <p><strong>FUNNY:</strong> <span id="aiFunny">...</span></p>
+                    <p><strong>CONFIDENCE:</strong> <span id="aiConfidence">...</span></p>
+                </div>
+            </div>
+
+        </section>
+    </main>
+
+    <script type="module" src="app.js"></script>
+</body>
+</html>
