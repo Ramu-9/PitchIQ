@@ -39,6 +39,9 @@ public class DatabaseSeeder implements CommandLineRunner {
         System.out.println("Starting one-time ETL database seeding...");
 
         File dataDir = new File("cricsheet_data");
+        if (!dataDir.exists()) {
+            dataDir = new File("../cricsheet_data");
+        }
         if (!dataDir.exists() || !dataDir.isDirectory()) {
             System.err.println("cricsheet_data directory not found. Please download Cricsheet JSON files first.");
             return;
@@ -78,7 +81,6 @@ public class DatabaseSeeder implements CommandLineRunner {
 
         saveToDatabase(venuePhaseCounts);
         System.out.println("Database seeding completed.");
-        System.exit(0); // Exit after seeding is done so it doesn't keep the web server running
     }
 
     private void saveToDatabase(Map<String, Map<String, Map<BallOutcome, Integer>>> venuePhaseCounts) {

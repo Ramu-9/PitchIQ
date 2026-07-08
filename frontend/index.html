@@ -3,114 +3,297 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PitchIQ - Where Data Meets Cricket</title>
+    <title>PitchIQ — Real-Time Cricket Analytics</title>
+    <meta name="description" content="PitchIQ uses Monte Carlo simulations and AI to deliver real-time cricket match probability analysis.">
     <link rel="stylesheet" href="styles.css">
-    <!-- Google Fonts: Inter for that sleek modern look -->
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <!-- Google Fonts: Inter for premium typography -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <!-- Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <!-- tsparticles for futuristic background -->
-    <script src="https://cdn.jsdelivr.net/npm/tsparticles-engine@2/tsparticles.engine.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/tsparticles-basic@2/tsparticles.basic.min.js"></script>
 </head>
 <body>
-    <div id="tsparticles"></div>
+    <!-- Ambient Background -->
+    <canvas id="ambientCanvas"></canvas>
     
+    <!-- Simulation Loading Overlay -->
+    <div id="loadingOverlay" class="simulation-overlay" style="display: none;">
+        <div class="sim-overlay-content">
+            <div class="sim-logo-container">
+                <div class="sim-logo-pulse"></div>
+                <div class="sim-logo-text">PitchIQ</div>
+            </div>
+            
+            <div class="sim-counter-container">
+                <div id="simCounter" class="sim-counter">0</div>
+                <div id="simCounterSub" class="sim-counter-sub">Monte Carlo Simulations Completed</div>
+                <div id="simCounterDone" class="sim-counter-done" style="display: none;">&#10003; 10,000 Simulations Complete</div>
+            </div>
+
+            <div class="sim-progress-container">
+                <div class="sim-progress-bar">
+                    <div id="simProgressFill" class="sim-progress-fill"></div>
+                </div>
+                <div id="simStageText" class="sim-stage-text">Initializing Simulation...</div>
+            </div>
+        </div>
+    </div>
+
     <header class="glass-panel">
         <div class="logo">PitchIQ <span>TELEMETRY</span></div>
-        <div class="status-indicator">
-            <span class="pulse"></span> ENGINE ONLINE
+        <div class="user-status-area" id="userStatusArea">
+            
+            <!-- Authenticated Structure -->
+            <div id="authProfileContainer" class="auth-profile-container" style="display: none;">
+                
+                <div class="compact-profile" id="compactProfile">
+                    <img id="compactPhoto" src="" alt="Profile" class="profile-photo-small">
+                    <div class="compact-name-wrapper">
+                        <span class="compact-name" id="compactName"></span>
+                        <span class="dropdown-arrow">▼</span>
+                    </div>
+                </div>
+
+                <div class="profile-dropdown glass-panel" id="profileDropdown" style="display: none;">
+                    <div class="dropdown-header">
+                        <img id="dropdownPhoto" src="" alt="Profile" class="dropdown-photo">
+                        <div class="dropdown-user-info">
+                            <div class="dropdown-name" id="dropdownName"></div>
+                            <div class="dropdown-email" id="dropdownEmail"></div>
+                        </div>
+                    </div>
+                    
+                    <div class="dropdown-divider"></div>
+                    
+                    <div class="dropdown-item">
+                        <svg class="dropdown-icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+                            <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+                            <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
+                            <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+                        </svg>
+                        <div class="dropdown-text">Signed in with Google</div>
+                    </div>
+                    
+                    <div class="dropdown-divider"></div>
+                    
+                    <button id="signOutBtn" class="dropdown-item sign-out-item">
+                        <svg class="dropdown-icon sign-out-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                            <polyline points="16 17 21 12 16 7"></polyline>
+                            <line x1="21" y1="12" x2="9" y2="12"></line>
+                        </svg>
+                        <div class="dropdown-text">Sign Out</div>
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Engine Status (Shared) -->
+            <div class="status-indicator" id="engineStatus">
+                <span class="pulse"></span> ENGINE ONLINE
+            </div>
         </div>
     </header>
 
     <main class="dashboard">
-        <!-- Controls Panel -->
-        <section class="glass-panel controls">
-            <h2>Match State Input</h2>
-            <div class="input-grid">
-                <div class="input-group">
-                    <label>Current Runs</label>
-                    <input type="number" id="currentRuns" value="120">
-                </div>
-                <div class="input-group">
-                    <label>Wickets Down</label>
-                    <input type="number" id="currentWickets" value="4">
-                </div>
-                <div class="input-group">
-                    <label>Overs Bowled</label>
-                    <input type="number" id="oversBowled" value="15">
-                </div>
-                <div class="input-group">
-                    <label>Balls in Over</label>
-                    <input type="number" id="ballsBowled" value="2">
-                </div>
-                <div class="input-group">
-                    <label>Target Score</label>
-                    <input type="number" id="targetScore" value="185">
-                </div>
-                <div class="input-group">
-                    <label>AI Persona</label>
-                    <select id="personaSelect" style="width:100%; background:rgba(0,0,0,0.3); border:1px solid var(--panel-border); color:var(--accent-blue); padding:10px; border-radius:6px; font-family:'Inter'; outline:none;">
-                        <option value="Analyst">Analyst</option>
-                        <option value="Coach">Coach</option>
-                        <option value="Funny Fan">Funny Fan</option>
-                    </select>
-                </div>
+
+        <!-- Match Center -->
+        <section class="glass-panel live-matches-panel">
+            <h2>Match Center</h2>
+            
+            <div class="section-label section-label--live">🔴 Live Matches</div>
+            <div id="liveMatchesContainer" class="matches-scroll-container">
+                <div style="color: var(--text-tertiary); font-size: 13px;">Loading live matches...</div>
             </div>
-            <button id="analyzeBtn" class="cyber-button">RUN SIMULATION <span class="arr">&rarr;</span></button>
+            
+            <div class="section-label section-label--recent" style="margin-top: var(--space-lg);">📝 Recent Results</div>
+            <div id="recentMatchesContainer" class="matches-scroll-container">
+                <div style="color: var(--text-tertiary); font-size: 13px;">Loading recent results...</div>
+            </div>
+
+            <div class="section-label section-label--upcoming" style="margin-top: var(--space-lg);">📅 Upcoming Matches</div>
+            <div id="upcomingMatchesContainer" class="matches-scroll-container">
+                <div style="color: var(--text-tertiary); font-size: 13px;">No upcoming fixtures.</div>
+            </div>
+
+            <div id="preMatchInsight" style="margin-top: var(--space-md); padding: var(--space-sm) var(--space-md); background: var(--accent-dim); border-left: 2px solid rgba(0, 200, 224, 0.3); border-radius: var(--radius-sm); display: none; font-size: 12px; color: var(--text-secondary);"></div>
         </section>
 
         <!-- Main HUD (Hidden until simulation runs) -->
         <section class="hud" id="hud" style="display: none;">
             
-            <div class="glass-panel stat-card main-stat">
-                <h3>WIN PROBABILITY</h3>
-                <div class="svg-ring-container">
-                    <svg viewBox="0 0 36 36" class="circular-chart blue">
-                        <path class="circle-bg"
-                            d="M18 2.0845
-                            a 15.9155 15.9155 0 0 1 0 31.831
-                            a 15.9155 15.9155 0 0 1 0 -31.831"
-                        />
-                        <path class="circle" id="winProbRing"
-                            stroke-dasharray="0, 100"
-                            d="M18 2.0845
-                            a 15.9155 15.9155 0 0 1 0 31.831
-                            a 15.9155 15.9155 0 0 1 0 -31.831"
-                        />
-                        <text x="18" y="20.35" class="percentage" id="winProbText">0%</text>
-                    </svg>
+            <!-- 2x2 Metrics Grid -->
+            <div class="metrics-grid">
+                
+                <!-- Win Probability (Hero Card) -->
+                <div class="glass-panel stat-card win-prob-card">
+                    <h3>WIN PROBABILITY</h3>
+                    <div class="svg-ring-container hero-ring">
+                        <svg viewBox="0 0 36 36" class="circular-chart blue">
+                            <path class="circle-bg"
+                                d="M18 2.0845
+                                a 15.9155 15.9155 0 0 1 0 31.831
+                                a 15.9155 15.9155 0 0 1 0 -31.831"
+                            />
+                            <path class="circle" id="winProbRing"
+                                stroke-dasharray="0, 100"
+                                d="M18 2.0845
+                                a 15.9155 15.9155 0 0 1 0 31.831
+                                a 15.9155 15.9155 0 0 1 0 -31.831"
+                            />
+                            <text x="18" y="20.35" class="percentage" id="winProbText">0%</text>
+                        </svg>
+                    </div>
                 </div>
-            </div>
 
-            <div class="glass-panel stat-card">
-                <h3>PROJECTED SCORE</h3>
-                <div class="big-number" id="projScoreText">0</div>
-                <div class="sub-stat">Expected Runs: <span id="expRunsText">0</span></div>
-            </div>
-
-            <div class="glass-panel stat-card">
-                <h3>REQUIRED RUN RATE</h3>
-                <div class="big-number" id="rrrText">0.00</div>
-                <div class="momentum-bar">
-                    <div class="momentum-fill" id="momentumFill" style="width: 50%;"></div>
+                <!-- Required Run Rate -->
+                <div class="glass-panel stat-card">
+                    <h3>REQUIRED RUN RATE</h3>
+                    <div class="big-number" id="rrrText">0.00</div>
+                    <div class="sub-stat">Runs per over needed</div>
                 </div>
-                <div class="sub-stat">Momentum Meter</div>
+
+                <!-- Current Run Rate -->
+                <div class="glass-panel stat-card">
+                    <h3>CURRENT RUN RATE</h3>
+                    <div class="big-number" id="crrText">0.00</div>
+                    <div class="sub-stat">Current runs per over</div>
+                </div>
+
+                <!-- Projected Score -->
+                <div class="glass-panel stat-card">
+                    <h3>PROJECTED SCORE</h3>
+                    <div class="big-number" id="projScoreText">-</div>
+                    <div class="sub-stat">Expected total: <span id="expRunsText">-</span></div>
+                </div>
+
             </div>
 
+            <!-- PitchIQ Intelligence -->
             <div class="glass-panel ai-panel">
-                <h3>GEMINI AI ANALYSIS</h3>
-                <div class="ai-content">
-                    <p><strong>FACT:</strong> <span id="aiFact">...</span></p>
-                    <p><strong>TACTICAL:</strong> <span id="aiTactical">...</span></p>
-                    <p><strong>FUNNY:</strong> <span id="aiFunny">...</span></p>
-                    <p><strong>CONFIDENCE:</strong> <span id="aiConfidence">...</span></p>
+                <h3>🧠 PitchIQ Intelligence</h3>
+                <ul class="intelligence-list" id="intelligenceList">
+                    <!-- Bullets injected here -->
+                </ul>
+            </div>
+
+            <!-- Ask PI Assistant -->
+            <div class="glass-panel ask-pi-panel">
+                <div class="ask-pi-header">
+                    <h3>🧠 Ask PI</h3>
+                    <span class="ask-pi-subtitle">PitchIQ Intelligence Assistant</span>
+                </div>
+                <div class="ask-pi-chat" id="askPiChat">
+                    <div class="chat-message pi-message">
+                        Welcome to Ask PI, the intelligence assistant behind PitchIQ. Designed and developed by Ramu Maddirala, PitchIQ transforms live cricket data into intelligent, data-driven insights. How can I help you analyze today's match?
+                    </div>
+                </div>
+                <div class="ask-pi-input-container">
+                    <input type="text" id="askPiInput" class="ask-pi-input" placeholder="Type your question..." autocomplete="off">
+                    <button id="askPiSendBtn" class="ask-pi-send-btn">
+                        <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+                    </button>
                 </div>
             </div>
 
         </section>
+
+        <!-- Controls Panel -->
+        <section class="glass-panel controls">
+            <div class="controls-header">
+                <h2>Match State Input</h2>
+                <div class="toggle-container">
+                    <label class="switch">
+                        <input type="checkbox" id="manualModeToggle">
+                        <span class="slider round"></span>
+                    </label>
+                    <span class="toggle-label">Manual Mode</span>
+                </div>
+            </div>
+            
+            <div class="input-grid">
+                <div class="input-group">
+                    <label>Match Format <span class="lock-icon">🔒</span></label>
+                    <select id="matchFormat" class="locked-input" disabled>
+                        <option value="t20">T20</option>
+                        <option value="odi">ODI</option>
+                        <option value="test">Test</option>
+                    </select>
+                </div>
+                <div class="input-group">
+                    <label>Current Runs <span class="lock-icon">🔒</span></label>
+                    <input type="number" id="currentRuns" value="" readonly class="locked-input">
+                </div>
+                <div class="input-group">
+                    <label>Wickets Down <span class="lock-icon">🔒</span></label>
+                    <input type="number" id="currentWickets" value="" readonly class="locked-input">
+                </div>
+                <div class="input-group">
+                    <label>Overs Bowled <span class="lock-icon">🔒</span></label>
+                    <input type="number" id="oversBowled" value="" readonly class="locked-input" step="0.1">
+                </div>
+                <div class="input-group">
+                    <label>Target Score <span class="lock-icon">🔒</span></label>
+                    <input type="number" id="targetScore" value="" readonly class="locked-input">
+                </div>
+            </div>
+            <div id="validationMessage" class="validation-error" style="display: none;"></div>
+            <button id="analyzeBtn" class="cyber-button">RUN SIMULATION <span class="arr">&rarr;</span></button>
+        </section>
+
     </main>
 
-    <script type="module" src="app.js"></script>
+    <!-- Authentication Modal -->
+    <div id="authModal" class="auth-overlay" style="display: none;">
+        <div class="auth-modal-content glass-panel">
+            <h2 class="auth-title">Continue with PitchIQ</h2>
+            <p class="auth-subtitle">Sign in to unlock AI-powered cricket analytics.</p>
+            <ul class="auth-features">
+                <li><span class="auth-check">✓</span> Monte Carlo Simulation</li>
+                <li><span class="auth-check">✓</span> PitchIQ Intelligence</li>
+                <li><span class="auth-check">✓</span> Ask PI</li>
+            </ul>
+            <div id="authErrorMsg" class="auth-error-msg" style="display: none;"></div>
+            <div class="auth-actions">
+                <button id="googleSignInBtn" class="cyber-button auth-btn">
+                    <svg class="google-icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+                        <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+                        <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
+                        <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+                    </svg>
+                    Continue with Google <span class="arr">&rarr;</span>
+                </button>
+                <button id="maybeLaterBtn" class="ghost-button auth-btn-ghost">Maybe Later</button>
+            </div>
+        </div>
+    </div>
+
+    <footer class="premium-footer" id="premiumFooter">
+        <div class="footer-tagline">Built with Love. <span>Driven by Passion.</span></div>
+        
+        <div class="footer-credits">
+            <div class="footer-credits-label">Designed & Developed by</div>
+            <div class="footer-author">Ramu Maddirala</div>
+        </div>
+
+        <div class="footer-social-label">Connect with me</div>
+        <div class="footer-social-links">
+            <a href="https://www.linkedin.com/in/ramalingam-maddirala-7m?utm_source=share_via&utm_content=profile&utm_medium=member_android" target="_blank" rel="noopener noreferrer" class="footer-link">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z"></path><rect x="2" y="9" width="4" height="12"></rect><circle cx="4" cy="4" r="2"></circle></svg>
+                LinkedIn
+            </a>
+            <span style="color: var(--text-tertiary); font-size: 10px;">•</span>
+            <a href="https://www.instagram.com/ramuuu.m?igsh=MXMzN2IxYmRybHN6ag==" target="_blank" rel="noopener noreferrer" class="footer-link">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"></line></svg>
+                Instagram
+            </a>
+        </div>
+
+        <div class="footer-copyright">&copy; 2026 PitchIQ. All Rights Reserved.</div>
+    </footer>
+
+    <script type="module" src="app.js?v=14"></script>
 </body>
 </html>

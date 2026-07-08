@@ -26,7 +26,7 @@ public class Main {
 
         // Test Case 1: Easy Chase
         // 120/2 in 15 overs (90 balls). Target 150. Need 30 off 30 balls.
-        MatchState state1 = new MatchState(120, 2, 90, 150);
+        MatchState state1 = new MatchState(120, 2, 90, 150, 120);
         long startTime = System.currentTimeMillis();
         SimulationResult result1 = simulator.simulate(state1, dist);
         long time1 = System.currentTimeMillis() - startTime;
@@ -36,14 +36,14 @@ public class Main {
 
         // Test Case 2: Impossible Chase
         // 100/9 in 18 overs (108 balls). Target 250. Need 150 off 12 balls.
-        MatchState state2 = new MatchState(100, 9, 108, 250);
+        MatchState state2 = new MatchState(100, 9, 108, 250, 120);
         SimulationResult result2 = simulator.simulate(state2, dist);
         System.out.println("Test Case 2: Impossible Chase (150 runs needed off 12 balls, 1 wicket in hand)");
         System.out.println(result2 + "\n");
 
         // Test Case 3: First Innings Projection
         // 80/1 in 10 overs (60 balls). No target (Setting).
-        MatchState state3 = new MatchState(80, 1, 60, 0);
+        MatchState state3 = new MatchState(80, 1, 60, 0, 120);
         SimulationResult result3 = simulator.simulate(state3, dist);
         System.out.println("Test Case 3: First Innings Projection (80/1 in 10 overs)");
         System.out.println(result3 + "\n");

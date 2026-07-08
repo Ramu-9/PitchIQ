@@ -7,9 +7,12 @@ import com.pitchiq.engine.MatchState;
 import com.pitchiq.engine.MonteCarloSimulator;
 import com.pitchiq.engine.ProbabilityDistribution;
 import com.pitchiq.engine.SimulationResult;
+import com.pitchiq.entity.VenueOutcomeProfile;
+import com.pitchiq.repository.VenueOutcomeProfileRepository;
 import org.springframework.stereotype.Service;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -20,26 +23,30 @@ public class SimulationService {
 
     private final MonteCarloSimulator simulator;
     private final AiCommentaryService aiCommentaryService;
+    private final VenueOutcomeProfileRepository profileRepository;
 
-    public SimulationService(AiCommentaryService aiCommentaryService) {
+    public SimulationService(AiCommentaryService aiCommentaryService, VenueOutcomeProfileRepository profileRepository) {
         this.simulator = new MonteCarloSimulator();
         this.aiCommentaryService = aiCommentaryService;
+        this.profileRepository = profileRepository;
     }
 
     public SimulationResponse runSimulation(MatchStateRequest request) {
         // 1. Map DTO to Engine State
-        int totalBallsBowled = (request.getOversBowled() * 6) + request.getBallsBowledInOver();
+        int fullOvers = (int) request.getOvers();
+        int ballsInPartialOver = (int) Math.round((request.getOvers() - fullOvers) * 10);
+        int totalBallsBowled = (fullOvers * 6) + ballsInPartialOver;
+        int maxBalls = request.getMaxOvers() * 6;
         MatchState initialState = new MatchState(
                 request.getCurrentRuns(),
                 request.getCurrentWickets(),
                 totalBallsBowled,
-                request.getTargetScore()
+                request.getTargetScore(),
+                maxBalls
         );
 
         // 2. Fetch Probability Distribution
-        // TODO: In Phase 5, this will be fetched from the Database based on Venue and Phase.
-        // For Phase 4, we use a mock baseline distribution.
-        ProbabilityDistribution dist = getBaselineDistribution();
+        ProbabilityDistribution dist = getDistributionFromDatabase((long) request.getVenueId(), totalBallsBowled);
 
         // 3. Run Simulation Engine
         SimulationResult result = simulator.simulate(initialState, dist);
@@ -48,22 +55,45 @@ public class SimulationService {
         SimulationResponse response = new SimulationResponse();
         response.setWinProbability(result.getWinProbability());
         response.setProjectedScore(result.getProjectedScore());
+        response.setVenueName(request.getVenueName());
 
         if (request.getTargetScore() > 0) {
             response.setExpectedRunsRemaining(request.getTargetScore() - request.getCurrentRuns());
-            int ballsRemaining = 120 - totalBallsBowled;
+            int ballsRemaining = maxBalls - totalBallsBowled;
             if (ballsRemaining > 0) {
                 response.setRequiredRunRate(((double) response.getExpectedRunsRemaining() / ballsRemaining) * 6);
             }
         }
         
-        // Mock momentum meter (0 to 1) based on simple heuristic for now
-        response.setMomentumMeter(0.5);
+        // Calculate momentum meter (0 to 1) based on current win probability
+        response.setMomentumMeter(result.getWinProbability());
 
-        // Enhance with AI
-        aiCommentaryService.enrichWithCommentary(response, request);
+        // 5. Enrich with Commentary
+        aiCommentaryService.enrichWithCommentary(response);
 
         return response;
+    }
+
+    private ProbabilityDistribution getDistributionFromDatabase(Long venueId, int ballsBowled) {
+        String phase = getMatchPhase(ballsBowled);
+        List<VenueOutcomeProfile> profiles = profileRepository.findByVenueIdAndMatchPhase(venueId, phase);
+        
+        if (profiles.isEmpty()) {
+            return getBaselineDistribution(); // Fallback if no DB data
+        }
+        
+        Map<BallOutcome, Double> weights = new HashMap<>();
+        for (VenueOutcomeProfile profile : profiles) {
+            weights.put(profile.getOutcomeType(), profile.getProbabilityWeight());
+        }
+        
+        return new ProbabilityDistribution(weights);
+    }
+    
+    private String getMatchPhase(int ballsBowled) {
+        if (ballsBowled < 36) return "POWERPLAY";
+        if (ballsBowled < 90) return "MIDDLE";
+        return "DEATH";
     }
 
     private ProbabilityDistribution getBaselineDistribution() {

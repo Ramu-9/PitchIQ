@@ -8,12 +8,17 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import java.util.HashMap;
 import java.util.Map;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 /**
  * Handles exceptions globally to ensure clean JSON responses.
  * Discussing @ControllerAdvice is an excellent talking point for Spring Boot interviews.
  */
 @ControllerAdvice
 public class GlobalExceptionHandler {
+
+    private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<Map<String, String>> handleIllegalArgumentException(IllegalArgumentException ex) {
@@ -25,7 +30,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<Map<String, String>> handleGenericException(Exception ex) {
-        ex.printStackTrace();
+        log.error("Unhandled exception: ", ex);
         Map<String, String> error = new HashMap<>();
         error.put("error", "Internal Server Error");
         error.put("message", "An unexpected error occurred during simulation.");

@@ -11,12 +11,14 @@ public class MatchState {
     private int currentWickets;
     private int ballsBowled;
     private int targetScore; // 0 if setting a target (1st innings)
+    private int maxBalls;
 
-    public MatchState(int currentRuns, int currentWickets, int ballsBowled, int targetScore) {
+    public MatchState(int currentRuns, int currentWickets, int ballsBowled, int targetScore, int maxBalls) {
         this.currentRuns = currentRuns;
         this.currentWickets = currentWickets;
         this.ballsBowled = ballsBowled;
         this.targetScore = targetScore;
+        this.maxBalls = maxBalls;
     }
 
     // Copy constructor for resetting simulation iterations
@@ -25,6 +27,7 @@ public class MatchState {
         this.currentWickets = other.currentWickets;
         this.ballsBowled = other.ballsBowled;
         this.targetScore = other.targetScore;
+        this.maxBalls = other.maxBalls;
     }
 
     public void update(BallOutcome outcome) {
@@ -36,7 +39,7 @@ public class MatchState {
     }
 
     public boolean isInningsOver() {
-        return currentWickets >= 10 || ballsBowled >= 120 || hasTargetBeenChased();
+        return currentWickets >= 10 || ballsBowled >= maxBalls || hasTargetBeenChased();
     }
     
     public boolean hasTargetBeenChased() {

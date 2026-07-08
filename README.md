@@ -12,7 +12,7 @@
 ## 🚀 Overview
 
 **PitchIQ** is a production-grade, highly optimized Monte Carlo simulation engine and analytics suite designed to provide real-time predictive insights for T20 Cricket matches. 
-
+1
 Built with an unapologetic focus on **Clean Architecture, O(1) memory footprint during simulations, and zero-latency performance**, PitchIQ is designed to impress engineering teams with its backend rigor and its stunning, F1-inspired telemetry frontend.
 
 Unlike typical sports predictors, PitchIQ features a strict **"Explainable AI"** boundary: The core Monte Carlo engine (pure Java) calculates raw statistical probabilities based on historical `Cricsheet` telemetry, while a tightly scoped integration with **Google Gemini 1.5 Flash** translates those cold, hard numbers into dynamic, persona-driven commentary (Analyst, Coach, or Fan) *without ever hallucinating its own predictions*.

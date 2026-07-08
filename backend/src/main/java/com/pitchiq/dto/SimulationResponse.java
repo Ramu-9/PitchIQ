@@ -1,6 +1,6 @@
 package com.pitchiq.dto;
 
-import java.util.Map;
+import java.util.List;
 
 public class SimulationResponse {
     private double winProbability;
@@ -8,9 +8,12 @@ public class SimulationResponse {
     private int expectedRunsRemaining;
     private double requiredRunRate;
     private double momentumMeter;
-    private Map<String, String> aiCommentary;
+    private List<String> aiCommentary;
+    private String venueName;
 
     // Getters and setters
+    public String getVenueName() { return venueName; }
+    public void setVenueName(String venueName) { this.venueName = venueName; }
     public double getWinProbability() { return winProbability; }
     public void setWinProbability(double winProbability) { this.winProbability = winProbability; }
 
@@ -26,6 +29,6 @@ public class SimulationResponse {
     public double getMomentumMeter() { return momentumMeter; }
     public void setMomentumMeter(double momentumMeter) { this.momentumMeter = momentumMeter; }
 
-    public Map<String, String> getAiCommentary() { return aiCommentary; }
-    public void setAiCommentary(Map<String, String> aiCommentary) { this.aiCommentary = aiCommentary; }
+    public List<String> getAiCommentary() { return aiCommentary; }
+    public void setAiCommentary(List<String> aiCommentary) { this.aiCommentary = aiCommentary; }
 }

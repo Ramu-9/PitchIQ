@@ -26,7 +26,6 @@ public class CricsheetMatch {
     public static class InningsWrapper {
         public String team;
         public List<Over> overs;
-        public Integer target; // Only exists sometimes in newer formats, we'll calculate manually
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)

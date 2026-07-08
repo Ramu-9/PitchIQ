@@ -52,6 +52,7 @@ public class CricsheetParser {
                     System.out.println("Processed " + matchesProcessed + " matches...");
                 }
             } catch (Exception e) {
+                System.err.println("Failed to parse " + file.getName() + ": " + e.getMessage());
                 // Skip malformed files
             }
         }

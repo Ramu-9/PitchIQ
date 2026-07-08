@@ -68,7 +68,7 @@ public class ModelValidator {
 
             // Checkpoints at end of over 6, 12, 16
             if (over.over == 5 || over.over == 11 || over.over == 15) { // 0-indexed overs
-                MatchState state = new MatchState(runs, wickets, balls, targetScore);
+                MatchState state = new MatchState(runs, wickets, balls, targetScore, 120);
                 double winProb = simulator.simulate(state, dist).getWinProbability();
                 records.add(new PredictionRecord(winProb, actualWin));
             }
