@@ -99,8 +99,10 @@ public class LiveCricketDataProvider implements CricketDataProvider {
             return allMatches;
         } catch (Exception e) {
             log.error("Failed to fetch matches from CricAPI: {}", e.getMessage());
-            // Fallback to cached data if API fails
-            return entry != null ? entry.data : new ArrayList<>();
+            if (entry != null) {
+                return entry.data;
+            }
+            throw new RuntimeException("CricAPI fetch failed", e);
         }
     }
 
@@ -122,7 +124,10 @@ public class LiveCricketDataProvider implements CricketDataProvider {
             return match;
         } catch (Exception e) {
             log.error("Failed to fetch match details from CricAPI: {}", e.getMessage());
-            return entry != null ? entry.data : null;
+            if (entry != null) {
+                return entry.data;
+            }
+            throw new RuntimeException("CricAPI fetch failed", e);
         }
     }
 

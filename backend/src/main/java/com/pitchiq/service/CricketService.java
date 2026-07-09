@@ -25,8 +25,11 @@ public class CricketService {
         try {
             return primaryProvider.getLiveMatches();
         } catch (Exception e) {
-            log.warn("[CricketService] Primary provider failed: {}. Falling back to Mock.", e.getMessage());
-            return mockFallback.getLiveMatches();
+            log.error("[CricketService] Primary provider failed: {}", e.getMessage());
+            throw new org.springframework.web.server.ResponseStatusException(
+                org.springframework.http.HttpStatus.SERVICE_UNAVAILABLE, 
+                "CricAPI is temporarily unavailable"
+            );
         }
     }
 
@@ -34,8 +37,11 @@ public class CricketService {
         try {
             return primaryProvider.getMatchDetails(matchId);
         } catch (Exception e) {
-            log.warn("[CricketService] Primary provider failed: {}. Falling back to Mock.", e.getMessage());
-            return mockFallback.getMatchDetails(matchId);
+            log.error("[CricketService] Primary provider failed: {}", e.getMessage());
+            throw new org.springframework.web.server.ResponseStatusException(
+                org.springframework.http.HttpStatus.SERVICE_UNAVAILABLE, 
+                "CricAPI is temporarily unavailable"
+            );
         }
     }
 }
