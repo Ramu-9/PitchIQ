@@ -4,6 +4,10 @@ public class MatchStateRequest {
     private int venueId;
     private int battingTeamId;
     private int bowlingTeamId;
+    private String battingTeamName;
+    private String bowlingTeamName;
+    private String matchFormat;
+    private String matchStatus; // live, upcoming, completed
     private int currentRuns;
     private int currentWickets;
     private double overs;
@@ -21,6 +25,15 @@ public class MatchStateRequest {
     public void setBattingTeamId(int battingTeamId) { this.battingTeamId = battingTeamId; }
     public int getBowlingTeamId() { return bowlingTeamId; }
     public void setBowlingTeamId(int bowlingTeamId) { this.bowlingTeamId = bowlingTeamId; }
+    public String getBattingTeamName() { return battingTeamName; }
+    public void setBattingTeamName(String battingTeamName) { this.battingTeamName = battingTeamName; }
+    public String getBowlingTeamName() { return bowlingTeamName; }
+    public void setBowlingTeamName(String bowlingTeamName) { this.bowlingTeamName = bowlingTeamName; }
+    public String getMatchFormat() { return matchFormat; }
+    public void setMatchFormat(String matchFormat) { this.matchFormat = matchFormat; }
+    public String getMatchStatus() { return matchStatus; }
+    public void setMatchStatus(String matchStatus) { this.matchStatus = matchStatus; }
+    
     public int getCurrentRuns() { return currentRuns; }
     public void setCurrentRuns(int currentRuns) { this.currentRuns = currentRuns; }
     public int getCurrentWickets() { return currentWickets; }

@@ -439,6 +439,10 @@ document.getElementById('analyzeBtn').addEventListener('click', () => {
         venueName: window.currentMatchVenue || 'Unknown Venue',
         battingTeamId: 1,
         bowlingTeamId: 2,
+        battingTeamName: window.currentBattingTeam || 'T1',
+        bowlingTeamName: window.currentBowlingTeam || 'T2',
+        matchFormat: matchFormat,
+        matchStatus: window.currentMatchStatus || 'live',
         currentRuns: parseInt(document.getElementById('currentRuns').value) || 0,
         currentWickets: parseInt(document.getElementById('currentWickets').value) || 0,
         overs: oversInput,
@@ -552,9 +556,32 @@ document.getElementById('analyzeBtn').addEventListener('click', () => {
     let oversParts = oversStr.split('.');
     let completedOvers = parseInt(oversParts[0]) || 0;
     let balls = oversParts.length > 1 ? parseInt(oversParts[1]) || 0 : 0;
+    // Guard against NaN or Infinity
+    if (isNaN(completedOvers)) completedOvers = 0;
+    if (isNaN(balls)) balls = 0;
     let oversDecimal = completedOvers + (balls / 6.0);
-    let crr = oversDecimal > 0 ? (payload.currentRuns / oversDecimal) : 0;
+    let crr = 0;
+    if (oversDecimal > 0 && payload.currentRuns > 0) {
+        crr = payload.currentRuns / oversDecimal;
+    }
     let rrr = data.requiredRunRate || 0;
+
+    // Populate Top Match Header
+    document.getElementById('headerTeams').textContent = `${payload.battingTeamName} vs ${payload.bowlingTeamName}`;
+    document.getElementById('headerFormat').textContent = payload.matchFormat.toUpperCase();
+    document.getElementById('headerVenue').textContent = payload.venueName;
+    document.getElementById('headerScore').textContent = `${payload.currentRuns}/${payload.currentWickets} (${payload.overs})`;
+    document.getElementById('headerTarget').textContent = payload.targetScore > 0 ? payload.targetScore.toString() : "-";
+    
+    let confidence = "Low";
+    if (data.winProbability > 0.8 || data.winProbability < 0.2) confidence = "High";
+    else if (data.winProbability > 0.6 || data.winProbability < 0.4) confidence = "Medium";
+    document.getElementById('headerConfidence').textContent = confidence;
+    
+    let statusText = "🔴 LIVE";
+    if (payload.matchStatus === 'upcoming') statusText = "📅 UPCOMING";
+    if (payload.matchStatus === 'completed') statusText = "📝 COMPLETED";
+    document.getElementById('headerMatchStatus').textContent = statusText;
 
     // Trigger Animated Count-ups
     animateValue("winProbRing", 0, probPct, 1200, false, true); // We'll update the text in step
@@ -568,6 +595,25 @@ document.getElementById('analyzeBtn').addEventListener('click', () => {
          document.getElementById('winProbRing').setAttribute('stroke-dasharray', `0, 100`);
     }
 
+    // Populate Venue Report
+    const vr = data.venueIntelligence;
+    if (vr) {
+        document.getElementById('venueReportPanel').style.display = 'block';
+        document.getElementById('vrGround').textContent = vr.groundName || payload.venueName;
+        document.getElementById('vrCity').textContent = vr.city || '-';
+        document.getElementById('vrPitchType').textContent = vr.pitchType || '-';
+        document.getElementById('vrAvg1st').textContent = vr.averageFirstInningsScore || '-';
+        document.getElementById('vrBatting').textContent = vr.battingRating || '-';
+        document.getElementById('vrBowling').textContent = vr.bowlingRating || '-';
+        document.getElementById('vrPace').textContent = vr.paceSupport || '-';
+        document.getElementById('vrSpin').textContent = vr.spinSupport || '-';
+        document.getElementById('vrToss').textContent = vr.tossAdvantage || '-';
+        document.getElementById('vrDew').textContent = vr.dewFactor || '-';
+        document.getElementById('vrVerdict').textContent = vr.recommendedStrategy || vr.shortSummary || '-';
+    } else {
+        document.getElementById('venueReportPanel').style.display = 'none';
+    }
+
     // Update PitchIQ Intelligence
     if (data.aiCommentary && Array.isArray(data.aiCommentary)) {
         const list = document.getElementById('intelligenceList');
@@ -578,6 +624,7 @@ document.getElementById('analyzeBtn').addEventListener('click', () => {
             li.innerHTML = `<span class="intelligence-icon">${icons[i] || '•'}</span> <span>${data.aiCommentary[i]}</span>`;
             list.appendChild(li);
         }
+
         if (data.aiCommentary.length > 1) {
             const insightDiv = document.getElementById('preMatchInsight');
             insightDiv.style.display = 'block';
@@ -642,6 +689,8 @@ async function fetchLiveMatches() {
                 if (match.scores.length > 1) {
                     targetScore = match.scores[0].runs + 1;
                 }
+            } else if (match.matchEnded) {
+                latestScore = match.status || "Match Ended";
             } else {
                 latestScore = "Match starting soon";
             }
@@ -748,6 +797,9 @@ async function fetchLiveMatches() {
 
                 // Store venue context for simulations & AI
                 window.currentMatchVenue = match.venue || 'Unknown Venue';
+                window.currentBattingTeam = match.battingTeam || t1;
+                window.currentBowlingTeam = match.bowlingTeam || t2;
+                window.currentMatchStatus = section;
 
                 // Auto-populate
                 document.getElementById('currentRuns').value = runs;

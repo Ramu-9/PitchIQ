@@ -10,6 +10,7 @@ public class SimulationResponse {
     private double momentumMeter;
     private List<String> aiCommentary;
     private String venueName;
+    private VenueIntelligenceDto venueIntelligence;
 
     // Getters and setters
     public String getVenueName() { return venueName; }
@@ -31,4 +32,7 @@ public class SimulationResponse {
 
     public List<String> getAiCommentary() { return aiCommentary; }
     public void setAiCommentary(List<String> aiCommentary) { this.aiCommentary = aiCommentary; }
+
+    public VenueIntelligenceDto getVenueIntelligence() { return venueIntelligence; }
+    public void setVenueIntelligence(VenueIntelligenceDto venueIntelligence) { this.venueIntelligence = venueIntelligence; }
 }

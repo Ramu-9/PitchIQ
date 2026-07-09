@@ -1,7 +1,8 @@
 package com.pitchiq.service.provider;
 
 import com.pitchiq.dto.SimulationResponse;
-import com.pitchiq.dto.MatchDto;
+import com.pitchiq.dto.MatchStateRequest;
+import com.pitchiq.dto.VenueIntelligenceDto;
 import java.util.List;
 
 /**
@@ -11,16 +12,19 @@ import java.util.List;
 public interface AiCommentaryProvider {
     
     /**
-     * Generates a 5-part PitchIQ intelligence list.
+     * Generates a 5-part PitchIQ intelligence list based on match context.
      *
      * @param response The simulation response containing analytical data.
+     * @param request The match state request with context like teams and match status.
      * @return List of 5 intelligence bullets.
      */
-    List<String> generateCommentary(SimulationResponse response);
+    List<String> generateCommentary(SimulationResponse response, MatchStateRequest request);
 
     /**
-     * Generates a single pre-match insight string based on match context.
+     * Generates structured venue intelligence based on the ground and format.
      *
-     * @param match The match details.
-     * @return A pre-match insight string.
-     */}
+     * @param request The match state request containing venue details.
+     * @return VenueIntelligenceDto structured data.
+     */
+    VenueIntelligenceDto getVenueIntelligence(MatchStateRequest request);
+}

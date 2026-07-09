@@ -69,7 +69,7 @@ public class SimulationService {
         response.setMomentumMeter(result.getWinProbability());
 
         // 5. Enrich with Commentary
-        aiCommentaryService.enrichWithCommentary(response);
+        aiCommentaryService.enrichWithCommentary(response, request);
 
         return response;
     }
