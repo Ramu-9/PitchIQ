@@ -742,7 +742,9 @@ async function fetchLiveMatches() {
                             overs = ds.overs;
                         }
                     }
-                } catch(e) { }
+                } catch(e) {
+                    console.warn('[PitchIQ] Could not fetch match details, using summary data.', e);
+                }
 
                 // Store venue context for simulations & AI
                 window.currentMatchVenue = match.venue || 'Unknown Venue';
@@ -779,6 +781,11 @@ async function fetchLiveMatches() {
                 window.currentMatchId = match.id;
                 logEvent(analytics, 'select_live_match');
                 hideLoadingSequence();
+
+                // Automatically trigger the full analysis flow
+                // This programmatically clicks the analyze button which
+                // invokes authGuard -> simulation -> HUD rendering
+                btn.click();
             };
             
             if (section === 'live') {
