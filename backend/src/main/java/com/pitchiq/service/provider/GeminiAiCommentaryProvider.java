@@ -2,173 +2,286 @@ package com.pitchiq.service.provider;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.pitchiq.dto.SimulationResponse;
+import com.pitchiq.dto.CombinedIntelligenceResult;
 import com.pitchiq.dto.MatchStateRequest;
+import com.pitchiq.dto.SimulationResponse;
 import com.pitchiq.dto.VenueIntelligenceDto;
 import com.pitchiq.entity.VenueIntelligence;
 import com.pitchiq.repository.VenueIntelligenceRepository;
+import jakarta.annotation.PostConstruct;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
-import java.util.Arrays;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
-import java.util.stream.Collectors;
 
+/**
+ * Production Gemini AI provider.
+ * Makes ONE Gemini call per match open:
+ *   - If venue NOT cached: returns {"venue":{...}, "insights":[...]} → caches venue in PostgreSQL
+ *   - If venue IS cached:  returns ["insight1", ...] → uses cached venue data
+ * Never caches fallback/mock data.
+ */
 @Service
-@ConditionalOnProperty(name = "pitchiq.ai.provider", havingValue = "gemini")
 public class GeminiAiCommentaryProvider implements AiCommentaryProvider {
+
+    private static final Logger log = LoggerFactory.getLogger(GeminiAiCommentaryProvider.class);
 
     @Value("${gemini.api.key}")
     private String apiKey;
 
-    private static final String GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent?key=";
+    private static final String GEMINI_API_URL =
+            "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent?key=";
+    private static final int MAX_RETRIES = 2;
+
     private final RestTemplate restTemplate = new RestTemplate();
     private final ObjectMapper objectMapper = new ObjectMapper();
-    private static final int MAX_RETRIES = 2;
 
     @Autowired
     private VenueIntelligenceRepository venueRepository;
 
-    @Override
-    public List<String> generateCommentary(SimulationResponse response, MatchStateRequest request) {
-        if (apiKey == null || apiKey.trim().isEmpty() || apiKey.equals("MOCK_KEY_FOR_LOCAL_TESTING")) {
-            return getFallbackCommentary();
-        }
+    // ─── Startup Verification ───────────────────────────────────────────────
 
-        String prompt = buildMatchPrompt(response, request);
-        for (int attempt = 1; attempt <= MAX_RETRIES; attempt++) {
-            try {
-                String apiResponse = callGeminiApi(prompt);
-                List<String> commentary = parseMatchResponse(apiResponse);
-                if (commentary.size() >= 5) {
-                    return commentary.subList(0, 5);
-                }
-            } catch (Exception e) {
-                if (attempt == MAX_RETRIES) {
-                    return getFallbackCommentary();
-                }
-            }
+    @PostConstruct
+    public void logProviderActivation() {
+        boolean hasKey = apiKey != null && !apiKey.trim().isEmpty();
+        log.info("[PitchIQ] ✅ GeminiAiCommentaryProvider is ACTIVE. API key present: {}", hasKey);
+        if (!hasKey) {
+            log.warn("[PitchIQ] ⚠ GEMINI_API_KEY is empty — all calls will use fallback responses.");
         }
-        return getFallbackCommentary();
     }
 
+    // ─── Main Entry Point ───────────────────────────────────────────────────
+
     @Override
-    public VenueIntelligenceDto getVenueIntelligence(MatchStateRequest request) {
-        String venueName = request.getVenueName();
-        if (venueName == null || venueName.trim().isEmpty() || "Unknown Venue".equalsIgnoreCase(venueName)) {
-            return getFallbackVenueIntelligence();
+    public CombinedIntelligenceResult generateIntelligence(MatchStateRequest request, SimulationResponse simState) {
+        String venueName = nvl(request.getVenueName(), "Unknown Venue");
+        boolean venueUnknown = "Unknown Venue".equalsIgnoreCase(venueName.trim());
+
+        if (apiKeyMissing()) {
+            log.warn("[PitchIQ] API key missing — returning fallback intelligence.");
+            return fallback();
         }
 
-        // 1. Check DB Cache
-        Optional<VenueIntelligence> cached = venueRepository.findByVenueNameIgnoreCase(venueName.trim());
+        // Check PostgreSQL cache
+        Optional<VenueIntelligence> cached = venueUnknown
+                ? Optional.empty()
+                : venueRepository.findByVenueNameIgnoreCase(venueName.trim());
+
         if (cached.isPresent()) {
-            return mapEntityToDto(cached.get());
+            // ── CACHE HIT: Venue already in DB — ONE call for insights only ──
+            log.info("[PitchIQ] Cache HIT for venue '{}'. Generating fresh insights only.", venueName);
+            VenueIntelligenceDto venueDto = mapEntityToDto(cached.get());
+            List<String> insights = callGeminiForInsightsOnly(request, simState, venueDto);
+            return new CombinedIntelligenceResult(venueDto, insights);
         }
 
-        // 2. Call Gemini if not cached
-        if (apiKey == null || apiKey.trim().isEmpty() || apiKey.equals("MOCK_KEY_FOR_LOCAL_TESTING")) {
-            return getFallbackVenueIntelligence();
+        // ── CACHE MISS: ONE call for venue + insights combined ──
+        log.info("[PitchIQ] Cache MISS for venue '{}'. Calling Gemini for combined response.", venueName);
+        CombinedIntelligenceResult result = callGeminiForCombined(request, simState);
+
+        // Cache venue ONLY if it's a real Gemini response (not fallback)
+        VenueIntelligenceDto venueDto = result.getVenueIntelligence();
+        if (!venueUnknown && venueDto != null && isRealVenueData(venueDto)) {
+            try {
+                VenueIntelligence entity = mapDtoToEntity(venueDto, venueName);
+                venueRepository.save(entity);
+                log.info("[PitchIQ] Venue '{}' successfully cached in PostgreSQL.", venueName);
+            } catch (Exception e) {
+                log.warn("[PitchIQ] Failed to cache venue '{}': {}", venueName, e.getMessage());
+            }
+        } else {
+            log.warn("[PitchIQ] Venue data for '{}' is fallback/empty — NOT caching to PostgreSQL.", venueName);
         }
 
-        String prompt = buildVenuePrompt(venueName);
+        return result;
+    }
+
+    // ─── Gemini Calls ───────────────────────────────────────────────────────
+
+    /**
+     * ONE Gemini call when venue is NOT cached.
+     * Prompt asks for both venue data and match insights in one JSON object.
+     */
+    private CombinedIntelligenceResult callGeminiForCombined(MatchStateRequest request, SimulationResponse sim) {
+        String prompt = buildCombinedPrompt(request, sim);
         for (int attempt = 1; attempt <= MAX_RETRIES; attempt++) {
             try {
-                String apiResponse = callGeminiApi(prompt);
-                VenueIntelligenceDto dto = parseVenueResponse(apiResponse);
-                dto.setGroundName(venueName); // Ensure it has a name
-                
-                // 3. Save to DB Cache
-                VenueIntelligence entity = mapDtoToEntity(dto, venueName);
-                venueRepository.save(entity);
-                
-                return dto;
+                String rawJson = callGeminiApi(prompt);
+                String text = extractAndCleanText(rawJson);
+                log.debug("[PitchIQ] Combined Gemini raw text: {}", text.substring(0, Math.min(200, text.length())));
+                return parseCombinedResponse(text);
             } catch (Exception e) {
-                if (attempt == MAX_RETRIES) {
-                    return getFallbackVenueIntelligence();
-                }
+                log.warn("[PitchIQ] Combined Gemini call attempt {}/{} failed: {}", attempt, MAX_RETRIES, e.getMessage());
             }
         }
-        return getFallbackVenueIntelligence();
+        log.error("[PitchIQ] All combined Gemini attempts failed — using fallback.");
+        return fallback();
     }
 
-    private String buildMatchPrompt(SimulationResponse response, MatchStateRequest request) {
-        String status = request.getMatchStatus() != null ? request.getMatchStatus().toLowerCase() : "live";
-        String t1 = request.getBattingTeamName() != null ? request.getBattingTeamName() : "Batting Team";
-        String t2 = request.getBowlingTeamName() != null ? request.getBowlingTeamName() : "Bowling Team";
-        
-        String baseContext = String.format("Teams: %s vs %s\nVenue: %s\nFormat: %s\n", t1, t2, request.getVenueName(), request.getMatchFormat());
-        
+    /**
+     * ONE Gemini call when venue IS cached.
+     * Prompt asks for match insights only (venue context provided inline).
+     */
+    private List<String> callGeminiForInsightsOnly(MatchStateRequest request, SimulationResponse sim, VenueIntelligenceDto venue) {
+        String prompt = buildInsightsOnlyPrompt(request, sim, venue);
+        for (int attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+            try {
+                String rawJson = callGeminiApi(prompt);
+                String text = extractAndCleanText(rawJson);
+                log.debug("[PitchIQ] Insights-only Gemini raw text: {}", text.substring(0, Math.min(200, text.length())));
+                return parseInsightsArray(text);
+            } catch (Exception e) {
+                log.warn("[PitchIQ] Insights Gemini call attempt {}/{} failed: {}", attempt, MAX_RETRIES, e.getMessage());
+            }
+        }
+        log.error("[PitchIQ] All insights Gemini attempts failed — using fallback bullets.");
+        return fallbackInsights();
+    }
+
+    // ─── Prompt Builders ────────────────────────────────────────────────────
+
+    private String buildCombinedPrompt(MatchStateRequest request, SimulationResponse sim) {
+        String status = nvl(request.getMatchStatus(), "live").toLowerCase();
+        String t1 = nvl(request.getBattingTeamName(), "Team A");
+        String t2 = nvl(request.getBowlingTeamName(), "Team B");
+        String venue = nvl(request.getVenueName(), "Unknown Venue");
+        String format = nvl(request.getMatchFormat(), "t20").toUpperCase();
+
+        StringBuilder sb = new StringBuilder();
+        sb.append("You are a cricket intelligence analyst. Return ONLY raw JSON with no markdown, no code fences, no explanation.\n");
+        sb.append("Match: ").append(t1).append(" vs ").append(t2)
+          .append(" | Venue: ").append(venue)
+          .append(" | Format: ").append(format)
+          .append(" | Status: ").append(status.toUpperCase()).append("\n");
+        sb.append(buildMatchContext(request, sim, status)).append("\n");
+        sb.append("Return this exact JSON structure (fill all string fields with real cricket data for ").append(venue).append("):\n");
+        sb.append("{\"venue\":{");
+        sb.append("\"groundName\":\"\",\"city\":\"\",\"pitchType\":\"\",\"battingRating\":\"\",\"bowlingRating\":\"\",");
+        sb.append("\"spinSupport\":\"\",\"paceSupport\":\"\",\"averageFirstInningsScore\":\"\",\"highestSuccessfulChase\":\"\",");
+        sb.append("\"boundarySize\":\"\",\"dewFactor\":\"\",\"tossAdvantage\":\"\",\"historicalTrend\":\"\",");
+        sb.append("\"recommendedStrategy\":\"\",\"shortSummary\":\"\"");
+        sb.append("},\"insights\":[\"insight1\",\"insight2\",\"insight3\",\"insight4\",\"insight5\"]}");
+        return sb.toString();
+    }
+
+    private String buildInsightsOnlyPrompt(MatchStateRequest request, SimulationResponse sim, VenueIntelligenceDto venue) {
+        String status = nvl(request.getMatchStatus(), "live").toLowerCase();
+        String t1 = nvl(request.getBattingTeamName(), "Team A");
+        String t2 = nvl(request.getBowlingTeamName(), "Team B");
+        String format = nvl(request.getMatchFormat(), "t20").toUpperCase();
+
+        StringBuilder sb = new StringBuilder();
+        sb.append("You are a cricket intelligence analyst. Return ONLY a raw JSON array of exactly 5 concise insight strings, no markdown.\n");
+        sb.append("Match: ").append(t1).append(" vs ").append(t2)
+          .append(" | Format: ").append(format)
+          .append(" | Status: ").append(status.toUpperCase()).append("\n");
+        sb.append("Venue context: ").append(venue.getGroundName()).append(", ").append(venue.getCity())
+          .append(". Pitch: ").append(venue.getPitchType())
+          .append(". Avg 1st innings: ").append(venue.getAverageFirstInningsScore())
+          .append(". ").append(venue.getHistoricalTrend()).append("\n");
+        sb.append(buildMatchContext(request, sim, status)).append("\n");
+        sb.append("Return: [\"insight1\",\"insight2\",\"insight3\",\"insight4\",\"insight5\"]");
+        return sb.toString();
+    }
+
+    private String buildMatchContext(MatchStateRequest request, SimulationResponse sim, String status) {
         if ("upcoming".equals(status)) {
-            return "You are an expert cricket analyst providing pre-match intelligence.\n" +
-                   "State:\n" + baseContext +
-                   "Generate 5 concise professional pre-match insights (Pitch behaviour, Toss importance, Historical trends, Predicted Strategy).\n" +
-                   "RULES:\n1. 5 newline-separated plain-text lines.\n2. Max 20 words per line.\n3. NO markdown or numbering.";
+            return "Pre-match — no score yet. Generate pre-match predictions and strategy insights.";
         } else if ("completed".equals(status)) {
-            return "You are an expert cricket analyst providing post-match intelligence.\n" +
-                   "State:\n" + baseContext + "Target: " + request.getTargetScore() + "\nFinal Score: " + request.getCurrentRuns() + "/" + request.getCurrentWickets() + "\n" +
-                   "Generate 5 concise professional post-match insights explaining how the match was won (turning points, partnerships, bowling discipline).\n" +
-                   "RULES:\n1. 5 newline-separated plain-text lines.\n2. Max 20 words per line.\n3. NO markdown or numbering.";
+            return "Final: " + request.getCurrentRuns() + "/" + request.getCurrentWickets()
+                   + ". Target was: " + request.getTargetScore() + ". Generate post-match analysis.";
         } else {
-            // LIVE
-            return String.format(
-                "You are an expert cricket analyst providing live match intelligence.\n" +
-                "State:\n%s" +
-                "Score: %d/%d in %.1f overs. Target: %d\n" +
-                "Req Run Rate: %.2f\n" +
-                "Win Prob: %.1f%%\n" +
-                "Generate 5 concise professional live insights (Run rate context, tactical suggestions, partnership importance, phase analysis).\n" +
-                "RULES:\n1. 5 newline-separated plain-text lines.\n2. Max 20 words per line.\n3. NO markdown or numbering.",
-                baseContext, request.getCurrentRuns(), request.getCurrentWickets(), request.getOvers(), request.getTargetScore(), response.getRequiredRunRate(), response.getWinProbability() * 100
-            );
+            double rrr = (sim != null) ? sim.getRequiredRunRate() : 0;
+            double wp = (sim != null) ? sim.getWinProbability() * 100 : 50;
+            return String.format("Score: %d/%d in %.1f overs. Target: %d. RRR: %.2f. Win Prob: %.1f%%.",
+                    request.getCurrentRuns(), request.getCurrentWickets(),
+                    request.getOvers(), request.getTargetScore(), rrr, wp);
         }
     }
 
-    private String buildVenuePrompt(String venueName) {
-        return "You are an expert cricket venue analyst. Generate detailed intelligence for the following stadium: " + venueName + "\n" +
-               "Return ONLY a valid JSON object with the exact following string keys and no extra formatting or markdown code blocks:\n" +
-               "groundName, city, pitchType, battingRating, bowlingRating, spinSupport, paceSupport, averageFirstInningsScore, highestSuccessfulChase, boundarySize, dewFactor, tossAdvantage, historicalTrend, recommendedStrategy, shortSummary.";
-    }
+    // ─── Gemini API ─────────────────────────────────────────────────────────
 
     private String callGeminiApi(String prompt) throws Exception {
         String url = GEMINI_API_URL + apiKey;
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
-        String requestBody = "{ \"contents\": [{ \"parts\":[{\"text\": \"" + prompt.replace("\"", "\\\"").replace("\n", "\\n") + "\"}] }] }";
-        HttpEntity<String> request = new HttpEntity<>(requestBody, headers);
-        return restTemplate.postForObject(url, request, String.class);
+
+        // Use ObjectMapper to safely build the JSON request body (handles escaping correctly)
+        Map<String, Object> part = new HashMap<>();
+        part.put("text", prompt);
+        Map<String, Object> content = new HashMap<>();
+        content.put("parts", List.of(part));
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("contents", List.of(content));
+
+        String requestBody = objectMapper.writeValueAsString(payload);
+        HttpEntity<String> entity = new HttpEntity<>(requestBody, headers);
+        return restTemplate.postForObject(url, entity, String.class);
     }
 
-    private List<String> parseMatchResponse(String jsonResponse) throws Exception {
-        JsonNode root = objectMapper.readTree(jsonResponse);
+    private String extractAndCleanText(String geminiJsonResponse) throws Exception {
+        JsonNode root = objectMapper.readTree(geminiJsonResponse);
         JsonNode candidates = root.path("candidates");
-        if (candidates.isArray() && candidates.size() > 0) {
-            String text = candidates.get(0).path("content").path("parts").get(0).path("text").asText();
-            return Arrays.stream(text.split("\\n"))
-                    .map(s -> s.replaceAll("^\\d+\\.\\s*", "").replaceAll("^[\\*\\-•]\\s*", "").replaceAll("\\[.*?\\]", "").replace("**", "").trim())
-                    .filter(s -> !s.isEmpty())
-                    .collect(Collectors.toList());
+        if (!candidates.isArray() || candidates.isEmpty()) {
+            throw new RuntimeException("Gemini response has no candidates: " + geminiJsonResponse.substring(0, Math.min(300, geminiJsonResponse.length())));
         }
-        throw new RuntimeException("Invalid JSON from Gemini API");
+        String text = candidates.get(0).path("content").path("parts").get(0).path("text").asText();
+        // Strip markdown code fences that Gemini may add despite instructions
+        text = text.trim();
+        if (text.startsWith("```")) {
+            text = text.replaceAll("(?s)^```[a-zA-Z]*\\s*", "").replaceAll("\\s*```$", "").trim();
+        }
+        return text;
     }
 
-    private VenueIntelligenceDto parseVenueResponse(String jsonResponse) throws Exception {
-        JsonNode root = objectMapper.readTree(jsonResponse);
-        JsonNode candidates = root.path("candidates");
-        if (candidates.isArray() && candidates.size() > 0) {
-            String text = candidates.get(0).path("content").path("parts").get(0).path("text").asText();
-            // Clean markdown json blocks if gemini adds them despite instructions
-            text = text.replaceAll("^```json\\s*", "").replaceAll("\\s*```$", "").trim();
-            return objectMapper.readValue(text, VenueIntelligenceDto.class);
+    // ─── Response Parsers ───────────────────────────────────────────────────
+
+    private CombinedIntelligenceResult parseCombinedResponse(String cleanText) throws Exception {
+        JsonNode root = objectMapper.readTree(cleanText);
+        VenueIntelligenceDto venue = objectMapper.treeToValue(root.path("venue"), VenueIntelligenceDto.class);
+        List<String> insights = new ArrayList<>();
+        JsonNode insightsNode = root.path("insights");
+        if (insightsNode.isArray()) {
+            for (JsonNode n : insightsNode) {
+                String s = n.asText().trim();
+                if (!s.isEmpty()) insights.add(s);
+            }
         }
-        throw new RuntimeException("Invalid JSON from Gemini API");
+        if (insights.isEmpty()) {
+            throw new RuntimeException("Gemini combined response has no insights array");
+        }
+        return new CombinedIntelligenceResult(venue, insights);
     }
+
+    private List<String> parseInsightsArray(String cleanText) throws Exception {
+        JsonNode root = objectMapper.readTree(cleanText);
+        List<String> insights = new ArrayList<>();
+        // Handle both direct array and {"insights": [...]} wrapping
+        JsonNode arrayNode = root.isArray() ? root : root.path("insights");
+        if (arrayNode.isArray()) {
+            for (JsonNode n : arrayNode) {
+                String s = n.asText().trim();
+                if (!s.isEmpty()) insights.add(s);
+            }
+        }
+        if (insights.isEmpty()) {
+            throw new RuntimeException("Gemini insights-only response yielded empty list");
+        }
+        return insights;
+    }
+
+    // ─── Mapping ────────────────────────────────────────────────────────────
 
     private VenueIntelligenceDto mapEntityToDto(VenueIntelligence entity) {
         VenueIntelligenceDto dto = new VenueIntelligenceDto();
@@ -211,20 +324,28 @@ public class GeminiAiCommentaryProvider implements AiCommentaryProvider {
         return entity;
     }
 
-    private List<String> getFallbackCommentary() {
-        return Arrays.asList(
-            "Live intelligence is temporarily unavailable.",
-            "Historical venue data remains a strong indicator of match outcomes.",
-            "Statistical insights remain available through the PitchIQ engine.",
-            "Continue to monitor required run rates and projected scores.",
-            "The Monte Carlo simulation engine continues to process live telemetry."
-        );
+    // ─── Guards & Fallbacks ─────────────────────────────────────────────────
+
+    private boolean apiKeyMissing() {
+        return apiKey == null || apiKey.trim().isEmpty();
     }
 
-    private VenueIntelligenceDto getFallbackVenueIntelligence() {
+    /**
+     * Returns true only if the venue DTO has real data from Gemini.
+     * Prevents caching fallback/empty/placeholder responses.
+     */
+    private boolean isRealVenueData(VenueIntelligenceDto dto) {
+        if (dto == null) return false;
+        String name = dto.getGroundName();
+        return name != null && !name.trim().isEmpty()
+                && !"Unknown".equalsIgnoreCase(name.trim())
+                && !"N/A".equalsIgnoreCase(name.trim());
+    }
+
+    private CombinedIntelligenceResult fallback() {
         VenueIntelligenceDto dto = new VenueIntelligenceDto();
-        dto.setGroundName("Unknown");
-        dto.setCity("Unknown");
+        dto.setGroundName("N/A");
+        dto.setCity("N/A");
         dto.setPitchType("Balanced");
         dto.setBattingRating("Average");
         dto.setBowlingRating("Average");
@@ -235,9 +356,23 @@ public class GeminiAiCommentaryProvider implements AiCommentaryProvider {
         dto.setBoundarySize("Medium");
         dto.setDewFactor("Moderate");
         dto.setTossAdvantage("No significant advantage");
-        dto.setHistoricalTrend("Matches evenly split between chasing and defending.");
+        dto.setHistoricalTrend("Data temporarily unavailable.");
         dto.setRecommendedStrategy("Adapt to conditions on the day.");
-        dto.setShortSummary("Venue intelligence is currently unavailable.");
-        return dto;
+        dto.setShortSummary("Venue intelligence temporarily unavailable.");
+        return new CombinedIntelligenceResult(dto, fallbackInsights());
+    }
+
+    private List<String> fallbackInsights() {
+        return List.of(
+            "Live AI intelligence is temporarily unavailable.",
+            "Historical venue trends remain a strong predictor.",
+            "Monitor required run rate and wickets in hand closely.",
+            "Death overs typically decide T20 outcomes.",
+            "The Monte Carlo engine continues to calculate win probability."
+        );
+    }
+
+    private String nvl(String s, String def) {
+        return (s == null || s.trim().isEmpty()) ? def : s;
     }
 }

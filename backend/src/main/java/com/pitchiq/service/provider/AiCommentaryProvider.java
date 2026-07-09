@@ -1,30 +1,23 @@
 package com.pitchiq.service.provider;
 
-import com.pitchiq.dto.SimulationResponse;
+import com.pitchiq.dto.CombinedIntelligenceResult;
 import com.pitchiq.dto.MatchStateRequest;
-import com.pitchiq.dto.VenueIntelligenceDto;
-import java.util.List;
+import com.pitchiq.dto.SimulationResponse;
 
 /**
- * Interface defining the contract for AI Commentary generation.
- * This ensures the business logic remains decoupled from specific AI providers (Gemini, Mock, etc).
+ * Single-method contract for AI intelligence.
+ * Implementations make ONE external call and return both venue intelligence
+ * (eligible for caching) and match insights (always fresh) together.
  */
 public interface AiCommentaryProvider {
-    
-    /**
-     * Generates a 5-part PitchIQ intelligence list based on match context.
-     *
-     * @param response The simulation response containing analytical data.
-     * @param request The match state request with context like teams and match status.
-     * @return List of 5 intelligence bullets.
-     */
-    List<String> generateCommentary(SimulationResponse response, MatchStateRequest request);
 
     /**
-     * Generates structured venue intelligence based on the ground and format.
+     * Generates venue intelligence (from cache or Gemini) AND match insights
+     * (always fresh) in a single operation.
      *
-     * @param request The match state request containing venue details.
-     * @return VenueIntelligenceDto structured data.
+     * @param request  Full match state context.
+     * @param simState Simulation output (win probability, RRR, projected score).
+     * @return Combined result containing venueIntelligence and insights list.
      */
-    VenueIntelligenceDto getVenueIntelligence(MatchStateRequest request);
+    CombinedIntelligenceResult generateIntelligence(MatchStateRequest request, SimulationResponse simState);
 }
