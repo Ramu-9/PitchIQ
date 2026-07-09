@@ -10,8 +10,10 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -33,8 +35,15 @@ public class LiveCricketDataProvider implements CricketDataProvider {
     @Value("${cricapi.base-url}")
     private String baseUrl;
 
-    private final RestTemplate restTemplate = new RestTemplate();
+    private final RestTemplate restTemplate;
     private final ObjectMapper objectMapper = new ObjectMapper();
+
+    public LiveCricketDataProvider() {
+        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
+        factory.setConnectTimeout(5000); // 5 seconds
+        factory.setReadTimeout(10000);   // 10 seconds
+        this.restTemplate = new RestTemplate(factory);
+    }
 
     private static class CacheEntry<T> {
         final T data;
@@ -102,7 +111,7 @@ public class LiveCricketDataProvider implements CricketDataProvider {
             if (entry != null) {
                 return entry.data;
             }
-            throw new RuntimeException("CricAPI fetch failed", e);
+            return new ArrayList<>(); // Return empty instead of throwing to prevent 500 error cascade
         }
     }
 
@@ -127,7 +136,7 @@ public class LiveCricketDataProvider implements CricketDataProvider {
             if (entry != null) {
                 return entry.data;
             }
-            throw new RuntimeException("CricAPI fetch failed", e);
+            return null; // Return null gracefully
         }
     }
 

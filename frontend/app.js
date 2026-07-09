@@ -367,6 +367,10 @@ document.getElementById('analyzeBtn').addEventListener('click', () => {
     authGuard(async () => {
         logEvent(analytics, 'run_simulation');
         const btn = document.getElementById('analyzeBtn');
+        
+        // Prevent double clicks
+        if (btn.disabled) return;
+        btn.disabled = true;
     
     const matchFormat = document.getElementById('matchFormat').value;
     const oversInput = parseFloat(document.getElementById('oversBowled').value) || 0;
@@ -380,6 +384,7 @@ document.getElementById('analyzeBtn').addEventListener('click', () => {
             validationMsg.textContent = "Please enter match state data before running simulation.";
             validationMsg.style.display = 'block';
             if (document.getElementById('loadingOverlay').style.display === 'flex') hideLoadingSequence();
+            btn.disabled = false;
             return;
         }
     }
@@ -389,248 +394,261 @@ document.getElementById('analyzeBtn').addEventListener('click', () => {
         validationMsg.textContent = "Validation Error: Maximum overs for T20 is 20.0";
         validationMsg.style.display = 'block';
         if (document.getElementById('loadingOverlay').style.display === 'flex') hideLoadingSequence();
+        btn.disabled = false;
         return;
     }
     if (matchFormat === 'odi' && oversInput > 50.0) {
         validationMsg.textContent = "Validation Error: Maximum overs for ODI is 50.0";
         validationMsg.style.display = 'block';
         if (document.getElementById('loadingOverlay').style.display === 'flex') hideLoadingSequence();
+        btn.disabled = false;
         return;
     }
 
-    // --- Premium Simulation UX Start ---
-    const overlay = document.getElementById('loadingOverlay');
-    const text = document.getElementById('simStageText');
-    const fill = document.getElementById('simProgressFill');
-    const counter = document.getElementById('simCounter');
-    const counterDone = document.getElementById('simCounterDone');
-    const counterSub = document.getElementById('simCounterSub');
-    const counterContainer = document.querySelector('.sim-counter-container');
-    
-    // Reset overlay state
-    counter.textContent = "0";
-    counterDone.style.display = "none";
-    counter.style.display = "block";
-    counterSub.style.display = "block";
-    fill.style.width = "0%";
-    if (counterContainer) counterContainer.style.display = 'flex';
-    
-    overlay.style.display = 'flex';
-    // Small delay to allow display block to apply before opacity transition
-    await new Promise(r => setTimeout(r, 10));
-    overlay.style.opacity = '1';
+    try {
+        // --- Premium Simulation UX Start ---
+        const overlay = document.getElementById('loadingOverlay');
+        const text = document.getElementById('simStageText');
+        const fill = document.getElementById('simProgressFill');
+        const counter = document.getElementById('simCounter');
+        const counterDone = document.getElementById('simCounterDone');
+        const counterSub = document.getElementById('simCounterSub');
+        const counterContainer = document.querySelector('.sim-counter-container');
+        
+        // Reset overlay state
+        counter.textContent = "0";
+        counterDone.style.display = "none";
+        counter.style.display = "block";
+        counterSub.style.display = "block";
+        fill.style.width = "0%";
+        if (counterContainer) counterContainer.style.display = 'flex';
+        
+        overlay.style.display = 'flex';
+        // Small delay to allow display block to apply before opacity transition
+        await new Promise(r => setTimeout(r, 10));
+        overlay.style.opacity = '1';
 
-    // Stage 1: Initializing
-    text.textContent = "Initializing Simulation...";
-    fill.style.width = "15%";
-    await new Promise(r => setTimeout(r, 300));
-
-    // Stage 2: Running Simulations
-    text.textContent = "Running 10,000 Monte Carlo Simulations...";
-    fill.style.width = "40%";
-    
-    // Start backend request concurrently with counter animation
-    let maxOvers = 20;
-    if (matchFormat === 'odi') maxOvers = 50;
-    if (matchFormat === 'test') maxOvers = 450;
-
-    const payload = {
-        venueId: 1, 
-        venueName: window.currentMatchVenue || 'Unknown Venue',
-        battingTeamId: 1,
-        bowlingTeamId: 2,
-        battingTeamName: window.currentBattingTeam || 'T1',
-        bowlingTeamName: window.currentBowlingTeam || 'T2',
-        matchFormat: matchFormat,
-        matchStatus: window.currentMatchStatus || 'live',
-        currentRuns: parseInt(document.getElementById('currentRuns').value) || 0,
-        currentWickets: parseInt(document.getElementById('currentWickets').value) || 0,
-        overs: oversInput,
-        targetScore: parseInt(document.getElementById('targetScore').value) || 0,
-        maxOvers: maxOvers
-    };
-
-    const fetchPromise = fetch('https://pitchiq-production-7a44.up.railway.app/api/v1/analyze', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-    }).then(async res => {
-        if (!res.ok) throw new Error("Backend offline");
-        return res.json();
-    }).catch(e => {
-        return { // Fallback data
-            winProbability: 0.73,
-            projectedScore: 195,
-            expectedRunsRemaining: 75,
-            requiredRunRate: 9.6,
-            momentumMeter: 0.8,
-            aiCommentary: [
-                "Live intelligence is temporarily unavailable.",
-                "Historical venue data remains a strong indicator of match outcomes.",
-                "Statistical insights remain available through the PitchIQ engine.",
-                "Continue to monitor required run rates and projected scores.",
-                "The Monte Carlo simulation engine continues to process live telemetry."
-            ]
-        };
-    });
-
-    // Animate counter
-    const counterDuration = 1200;
-    const counterPromise = new Promise(resolve => {
-        let startTimestamp = null;
-        const step = (timestamp) => {
-            if (!startTimestamp) startTimestamp = timestamp;
-            const progress = Math.min((timestamp - startTimestamp) / counterDuration, 1);
-            // Ease out cubic
-            const easeOut = 1 - Math.pow(1 - progress, 3);
-            counter.textContent = Math.floor(easeOut * 10000).toLocaleString();
-            
-            if (progress < 1) {
-                window.requestAnimationFrame(step);
-            } else {
-                resolve();
-            }
-        };
-        window.requestAnimationFrame(step);
-    });
-
-    // Wait for both counter and fetch to complete
-    const [data] = await Promise.all([fetchPromise, counterPromise]);
-
-    // Show 10,000 Complete Mark
-    counter.style.display = "none";
-    counterSub.style.display = "none";
-    counterDone.style.display = "block";
-    await new Promise(r => setTimeout(r, 200));
-
-    // Stage 3: Computing
-    text.textContent = "Computing Match Probabilities...";
-    fill.style.width = "70%";
-    await new Promise(r => setTimeout(r, 300));
-
-    // Stage 4: AI Intelligence (Skip if not present)
-    if (data.aiCommentary && data.aiCommentary.length > 0) {
-        text.textContent = "Generating PitchIQ Intelligence...";
-        fill.style.width = "90%";
+        // Stage 1: Initializing
+        text.textContent = "Initializing Simulation...";
+        fill.style.width = "15%";
         await new Promise(r => setTimeout(r, 300));
-    }
 
-    // Stage 5: Rendering Dashboard
-    text.textContent = "Rendering Analytics Dashboard...";
-    fill.style.width = "100%";
-    await new Promise(r => setTimeout(r, 200));
+        // Stage 2: Running Simulations
+        text.textContent = "Running 10,000 Monte Carlo Simulations...";
+        fill.style.width = "40%";
+        
+        // Start backend request concurrently with counter animation
+        let maxOvers = 20;
+        if (matchFormat === 'odi') maxOvers = 50;
+        if (matchFormat === 'test') maxOvers = 450;
 
-    // Hide Overlay
-    overlay.style.opacity = '0';
-    setTimeout(() => { overlay.style.display = 'none'; }, 500);
+        const payload = {
+            venueId: 1, 
+            venueName: window.currentMatchVenue || 'Unknown Venue',
+            battingTeamId: 1,
+            bowlingTeamId: 2,
+            battingTeamName: window.currentBattingTeam || 'T1',
+            bowlingTeamName: window.currentBowlingTeam || 'T2',
+            matchFormat: matchFormat,
+            matchStatus: window.currentMatchStatus || 'live',
+            currentRuns: parseInt(document.getElementById('currentRuns').value) || 0,
+            currentWickets: parseInt(document.getElementById('currentWickets').value) || 0,
+            overs: oversInput,
+            targetScore: parseInt(document.getElementById('targetScore').value) || 0,
+            maxOvers: maxOvers
+        };
 
-    // --- End Simulation UX ---
+        const abortController = new AbortController();
+        const timeoutId = setTimeout(() => abortController.abort(), 18000); // 18s timeout
 
-    // Show HUD
-    const hud = document.getElementById('hud');
-    hud.style.display = 'flex';
-
-    // Remove old stagger classes to reset animation
-    const cards = hud.querySelectorAll('.glass-panel');
-    cards.forEach(c => {
-        c.classList.remove('stagger-enter');
-        c.classList.add('stagger-in');
-    });
-
-    // Trigger staggered entrance
-    setTimeout(() => {
-        cards.forEach((c, i) => {
-            setTimeout(() => {
-                c.classList.add('stagger-enter');
-            }, i * 100);
+        const fetchPromise = fetch('https://pitchiq-production-7a44.up.railway.app/api/v1/analyze', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+            signal: abortController.signal
+        }).then(async res => {
+            clearTimeout(timeoutId);
+            if (!res.ok) throw new Error("Backend offline");
+            return res.json();
+        }).catch(e => {
+            console.warn("Fetch failed or timed out", e);
+            return { // Fallback data
+                winProbability: 0.73,
+                projectedScore: 195,
+                expectedRunsRemaining: 75,
+                requiredRunRate: 9.6,
+                momentumMeter: 0.8,
+                aiCommentary: ["AI intelligence temporarily unavailable."]
+            };
         });
-    }, 100); // small delay to ensure DOM updates
 
-    // Prepare data
-    let probPct = 0;
-    if (!(payload.targetScore === 0 && payload.overs === 0 && payload.currentRuns === 0)) {
-        probPct = Math.round(data.winProbability * 100);
-    }
-    
-    let oversStr = payload.overs.toString();
-    let oversParts = oversStr.split('.');
-    let completedOvers = parseInt(oversParts[0]) || 0;
-    let balls = oversParts.length > 1 ? parseInt(oversParts[1]) || 0 : 0;
-    // Guard against NaN or Infinity
-    if (isNaN(completedOvers)) completedOvers = 0;
-    if (isNaN(balls)) balls = 0;
-    let oversDecimal = completedOvers + (balls / 6.0);
-    let crr = 0;
-    if (oversDecimal > 0 && payload.currentRuns > 0) {
-        crr = payload.currentRuns / oversDecimal;
-    }
-    let rrr = data.requiredRunRate || 0;
+        // Animate counter
+        const counterDuration = 1200;
+        const counterPromise = new Promise(resolve => {
+            let startTimestamp = null;
+            const step = (timestamp) => {
+                if (!startTimestamp) startTimestamp = timestamp;
+                const progress = Math.min((timestamp - startTimestamp) / counterDuration, 1);
+                // Ease out cubic
+                const easeOut = 1 - Math.pow(1 - progress, 3);
+                counter.textContent = Math.floor(easeOut * 10000).toLocaleString();
+                
+                if (progress < 1) {
+                    window.requestAnimationFrame(step);
+                } else {
+                    resolve();
+                }
+            };
+            window.requestAnimationFrame(step);
+        });
 
-    // Populate Top Match Header
-    document.getElementById('headerTeams').textContent = `${payload.battingTeamName} vs ${payload.bowlingTeamName}`;
-    document.getElementById('headerFormat').textContent = payload.matchFormat.toUpperCase();
-    document.getElementById('headerVenue').textContent = payload.venueName;
-    document.getElementById('headerScore').textContent = `${payload.currentRuns}/${payload.currentWickets} (${payload.overs})`;
-    document.getElementById('headerTarget').textContent = payload.targetScore > 0 ? payload.targetScore.toString() : "-";
-    
-    let confidence = "Low";
-    if (data.winProbability > 0.8 || data.winProbability < 0.2) confidence = "High";
-    else if (data.winProbability > 0.6 || data.winProbability < 0.4) confidence = "Medium";
-    document.getElementById('headerConfidence').textContent = confidence;
-    
-    let statusText = "🔴 LIVE";
-    if (payload.matchStatus === 'upcoming') statusText = "📅 UPCOMING";
-    if (payload.matchStatus === 'completed') statusText = "📝 COMPLETED";
-    document.getElementById('headerMatchStatus').textContent = statusText;
+        // Wait for counter to complete first so it doesn't appear stuck
+        await counterPromise;
 
-    // Trigger Animated Count-ups
-    animateValue("winProbRing", 0, probPct, 1200, false, true); // We'll update the text in step
-    animateValue("projScoreText", 0, data.projectedScore, 1000, false, false);
-    animateValue("crrText", 0, crr, 1000, true, false);
-    animateValue("rrrText", 0, rrr, 1000, true, false);
-    
-    document.getElementById('expRunsText').textContent = data.expectedRunsRemaining;
-    if (payload.targetScore === 0 && payload.overs === 0 && payload.currentRuns === 0) {
-         document.getElementById('winProbText').textContent = `N/A`;
-         document.getElementById('winProbRing').setAttribute('stroke-dasharray', `0, 100`);
-    }
+        // Show 10,000 Complete Mark
+        counter.style.display = "none";
+        counterSub.style.display = "none";
+        counterDone.style.display = "block";
+        await new Promise(r => setTimeout(r, 200));
 
-    // Populate Venue Report
-    const vr = data.venueIntelligence;
-    if (vr) {
-        document.getElementById('venueReportPanel').style.display = 'block';
-        document.getElementById('vrGround').textContent = vr.groundName || payload.venueName;
-        document.getElementById('vrCity').textContent = vr.city || '-';
-        document.getElementById('vrPitchType').textContent = vr.pitchType || '-';
-        document.getElementById('vrAvg1st').textContent = vr.averageFirstInningsScore || '-';
-        document.getElementById('vrBatting').textContent = vr.battingRating || '-';
-        document.getElementById('vrBowling').textContent = vr.bowlingRating || '-';
-        document.getElementById('vrPace').textContent = vr.paceSupport || '-';
-        document.getElementById('vrSpin').textContent = vr.spinSupport || '-';
-        document.getElementById('vrToss').textContent = vr.tossAdvantage || '-';
-        document.getElementById('vrDew').textContent = vr.dewFactor || '-';
-        document.getElementById('vrVerdict').textContent = vr.recommendedStrategy || vr.shortSummary || '-';
-    } else {
-        document.getElementById('venueReportPanel').style.display = 'none';
-    }
+        // Stage 3: Computing Match Probabilities & Waiting for AI
+        text.textContent = "Computing Match Probabilities...";
+        fill.style.width = "70%";
+        
+        // Now wait for fetch to complete if it hasn't already
+        const data = await fetchPromise;
 
-    // Update PitchIQ Intelligence
-    if (data.aiCommentary && Array.isArray(data.aiCommentary)) {
-        const list = document.getElementById('intelligenceList');
-        list.innerHTML = '';
-        const icons = ['📊', '🏟', '⚠', '🎯', '🧠'];
-        for (let i = 0; i < Math.min(5, data.aiCommentary.length); i++) {
-            const li = document.createElement('li');
-            li.innerHTML = `<span class="intelligence-icon">${icons[i] || '•'}</span> <span>${data.aiCommentary[i]}</span>`;
-            list.appendChild(li);
+        // Stage 4: AI Intelligence (Skip if not present)
+        if (data.aiCommentary && data.aiCommentary.length > 0) {
+            text.textContent = "Generating PitchIQ Intelligence...";
+            fill.style.width = "90%";
+            await new Promise(r => setTimeout(r, 300));
         }
 
-        if (data.aiCommentary.length > 1) {
-            const insightDiv = document.getElementById('preMatchInsight');
-            insightDiv.style.display = 'block';
-            insightDiv.innerHTML = `<strong>Venue Insight:</strong> ${data.aiCommentary[1]}`;
+        // Stage 5: Rendering Dashboard
+        text.textContent = "Rendering Analytics Dashboard...";
+        fill.style.width = "100%";
+        await new Promise(r => setTimeout(r, 200));
+
+        // Hide Overlay (Handled in finally block, but we fade out here)
+        overlay.style.opacity = '0';
+        await new Promise(r => setTimeout(r, 500));
+
+        // --- End Simulation UX ---
+
+        // Show HUD
+        const hud = document.getElementById('hud');
+        hud.style.display = 'flex';
+
+        // Remove old stagger classes to reset animation
+        const cards = hud.querySelectorAll('.glass-panel');
+        cards.forEach(c => {
+            c.classList.remove('stagger-enter');
+            c.classList.add('stagger-in');
+        });
+
+        // Trigger staggered entrance
+        setTimeout(() => {
+            cards.forEach((c, i) => {
+                setTimeout(() => {
+                    c.classList.add('stagger-enter');
+                }, i * 100);
+            });
+        }, 100); // small delay to ensure DOM updates
+
+        // Prepare data
+        let probPct = 0;
+        if (!(payload.targetScore === 0 && payload.overs === 0 && payload.currentRuns === 0)) {
+            probPct = Math.round(data.winProbability * 100);
         }
-        logEvent(analytics, 'generate_intelligence');
+        
+        let oversStr = payload.overs.toString();
+        let oversParts = oversStr.split('.');
+        let completedOvers = parseInt(oversParts[0]) || 0;
+        let balls = oversParts.length > 1 ? parseInt(oversParts[1]) || 0 : 0;
+        // Guard against NaN or Infinity
+        if (isNaN(completedOvers)) completedOvers = 0;
+        if (isNaN(balls)) balls = 0;
+        let oversDecimal = completedOvers + (balls / 6.0);
+        let crr = 0;
+        if (oversDecimal > 0 && payload.currentRuns > 0) {
+            crr = payload.currentRuns / oversDecimal;
+        }
+        let rrr = data.requiredRunRate || 0;
+
+        // Populate Top Match Header
+        document.getElementById('headerTeams').textContent = `${payload.battingTeamName} vs ${payload.bowlingTeamName}`;
+        document.getElementById('headerFormat').textContent = payload.matchFormat.toUpperCase();
+        document.getElementById('headerVenue').textContent = payload.venueName;
+        document.getElementById('headerScore').textContent = `${payload.currentRuns}/${payload.currentWickets} (${payload.overs})`;
+        document.getElementById('headerTarget').textContent = payload.targetScore > 0 ? payload.targetScore.toString() : "-";
+        
+        let confidence = "Low";
+        if (data.winProbability > 0.8 || data.winProbability < 0.2) confidence = "High";
+        else if (data.winProbability > 0.6 || data.winProbability < 0.4) confidence = "Medium";
+        document.getElementById('headerConfidence').textContent = confidence;
+        
+        let statusText = "🔴 LIVE";
+        if (payload.matchStatus === 'upcoming') statusText = "📅 UPCOMING";
+        if (payload.matchStatus === 'completed') statusText = "📝 COMPLETED";
+        document.getElementById('headerMatchStatus').textContent = statusText;
+
+        // Trigger Animated Count-ups
+        animateValue("winProbRing", 0, probPct, 1200, false, true); // We'll update the text in step
+        animateValue("projScoreText", 0, data.projectedScore, 1000, false, false);
+        animateValue("crrText", 0, crr, 1000, true, false);
+        animateValue("rrrText", 0, rrr, 1000, true, false);
+        
+        document.getElementById('expRunsText').textContent = data.expectedRunsRemaining;
+        if (payload.targetScore === 0 && payload.overs === 0 && payload.currentRuns === 0) {
+             document.getElementById('winProbText').textContent = `N/A`;
+             document.getElementById('winProbRing').setAttribute('stroke-dasharray', `0, 100`);
+        }
+
+        // Populate Venue Report
+        const vr = data.venueIntelligence;
+        if (vr) {
+            document.getElementById('venueReportPanel').style.display = 'block';
+            document.getElementById('vrGround').textContent = vr.groundName || payload.venueName;
+            document.getElementById('vrCity').textContent = vr.city || '-';
+            document.getElementById('vrPitchType').textContent = vr.pitchType || '-';
+            document.getElementById('vrAvg1st').textContent = vr.averageFirstInningsScore || '-';
+            document.getElementById('vrBatting').textContent = vr.battingRating || '-';
+            document.getElementById('vrBowling').textContent = vr.bowlingRating || '-';
+            document.getElementById('vrPace').textContent = vr.paceSupport || '-';
+            document.getElementById('vrSpin').textContent = vr.spinSupport || '-';
+            document.getElementById('vrToss').textContent = vr.tossAdvantage || '-';
+            document.getElementById('vrDew').textContent = vr.dewFactor || '-';
+            document.getElementById('vrVerdict').textContent = vr.recommendedStrategy || vr.shortSummary || '-';
+        } else {
+            document.getElementById('venueReportPanel').style.display = 'none';
+        }
+
+        // Update PitchIQ Intelligence
+        if (data.aiCommentary && Array.isArray(data.aiCommentary)) {
+            const list = document.getElementById('intelligenceList');
+            list.innerHTML = '';
+            const icons = ['📊', '🏟', '⚠', '🎯', '🧠'];
+            for (let i = 0; i < Math.min(5, data.aiCommentary.length); i++) {
+                const li = document.createElement('li');
+                li.innerHTML = `<span class="intelligence-icon">${icons[i] || '•'}</span> <span>${data.aiCommentary[i]}</span>`;
+                list.appendChild(li);
+            }
+
+            if (data.aiCommentary.length > 1 && data.aiCommentary[1] !== "AI intelligence temporarily unavailable.") {
+                const insightDiv = document.getElementById('preMatchInsight');
+                insightDiv.style.display = 'block';
+                insightDiv.innerHTML = `<strong>Venue Insight:</strong> ${data.aiCommentary[1]}`;
+            } else {
+                document.getElementById('preMatchInsight').style.display = 'none';
+            }
+            logEvent(analytics, 'generate_intelligence');
+        }
+    } catch (e) {
+        console.error("Simulation failed", e);
+    } finally {
+        hideLoadingSequence();
+        btn.disabled = false;
     }
     }); // End authGuard
 });
@@ -646,15 +664,18 @@ async function fetchLiveMatches() {
         const recentContainer = document.getElementById('recentMatchesContainer');
         const upcomingContainer = document.getElementById('upcomingMatchesContainer');
         
+        if (!matches || matches.length === 0) {
+            if (liveContainer.childElementCount === 0) {
+                liveContainer.innerHTML = '<div style="color: var(--text-tertiary); font-size: 13px;">No live matches available. Switched to Manual Mode.</div>';
+                if (!manualModeToggle.checked) manualModeToggle.click();
+            }
+            return;
+        }
+
+        // Only clear once we know we have data
         liveContainer.innerHTML = '';
         recentContainer.innerHTML = '';
         upcomingContainer.innerHTML = '';
-        
-        if (!matches || matches.length === 0) {
-            liveContainer.innerHTML = '<div style="color: var(--text-tertiary); font-size: 13px;">No live matches available. Switched to Manual Mode.</div>';
-            manualModeToggle.click(); // Enable manual mode if no matches
-            return;
-        }
 
         let liveCount = 0, recentCount = 0, upcomingCount = 0;
 
@@ -857,8 +878,13 @@ async function fetchLiveMatches() {
         if (upcomingCount === 0) upcomingContainer.innerHTML = '<div style="color: var(--text-tertiary); font-size: 13px;">No upcoming fixtures.</div>';
         
     } catch (e) {
-        document.getElementById('liveMatchesContainer').innerHTML = '<div style="color: var(--accent-warm); font-size: 13px;">Unable to load live matches. Switched to Manual Mode.</div>';
-        if (!manualModeToggle.checked) manualModeToggle.click();
+        console.warn("Failed to fetch live matches silently.", e);
+        const liveContainer = document.getElementById('liveMatchesContainer');
+        // Only show error if container is completely empty
+        if (liveContainer.childElementCount === 0) {
+            liveContainer.innerHTML = '<div style="color: var(--accent-warm); font-size: 13px;">Unable to load live matches. Switched to Manual Mode.</div>';
+            if (!manualModeToggle.checked) manualModeToggle.click();
+        }
     }
 }
 
@@ -871,9 +897,16 @@ setInterval(() => {
     }
 }, 60000);
 
+window.activeAnimations = window.activeAnimations || {};
+
 function animateValue(id, start, end, duration, isFloat = false, isRing = false) {
     const obj = document.getElementById(id);
     if (!obj) return;
+    
+    // Cancel any existing animation for this specific element to prevent layout thrashing
+    if (window.activeAnimations[id]) {
+        window.cancelAnimationFrame(window.activeAnimations[id]);
+    }
     
     let startTimestamp = null;
     const step = (timestamp) => {
@@ -895,10 +928,12 @@ function animateValue(id, start, end, duration, isFloat = false, isRing = false)
         }
         
         if (progress < 1) {
-            window.requestAnimationFrame(step);
+            window.activeAnimations[id] = window.requestAnimationFrame(step);
+        } else {
+            delete window.activeAnimations[id];
         }
     };
-    window.requestAnimationFrame(step);
+    window.activeAnimations[id] = window.requestAnimationFrame(step);
 }
 
 // Ask PI Implementation

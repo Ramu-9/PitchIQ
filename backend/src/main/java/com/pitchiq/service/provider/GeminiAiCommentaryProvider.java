@@ -18,6 +18,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -44,8 +45,15 @@ public class GeminiAiCommentaryProvider implements AiCommentaryProvider {
             "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent?key=";
     private static final int MAX_RETRIES = 2;
 
-    private final RestTemplate restTemplate = new RestTemplate();
+    private final RestTemplate restTemplate;
     private final ObjectMapper objectMapper = new ObjectMapper();
+
+    public GeminiAiCommentaryProvider() {
+        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
+        factory.setConnectTimeout(5000); // 5 seconds
+        factory.setReadTimeout(15000);   // 15 seconds
+        this.restTemplate = new RestTemplate(factory);
+    }
 
     @Autowired
     private VenueIntelligenceRepository venueRepository;
@@ -363,13 +371,7 @@ public class GeminiAiCommentaryProvider implements AiCommentaryProvider {
     }
 
     private List<String> fallbackInsights() {
-        return List.of(
-            "Live AI intelligence is temporarily unavailable.",
-            "Historical venue trends remain a strong predictor.",
-            "Monitor required run rate and wickets in hand closely.",
-            "Death overs typically decide T20 outcomes.",
-            "The Monte Carlo engine continues to calculate win probability."
-        );
+        return List.of("AI intelligence temporarily unavailable.");
     }
 
     private String nvl(String s, String def) {
