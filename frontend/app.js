@@ -446,7 +446,7 @@ document.getElementById('analyzeBtn').addEventListener('click', () => {
         maxOvers: maxOvers
     };
 
-    const fetchPromise = fetch('http://localhost:8080/api/v1/analyze', {
+    const fetchPromise = fetch('https://pitchiq-production-7a44.up.railway.app/api/v1/analyze', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
@@ -591,7 +591,7 @@ document.getElementById('analyzeBtn').addEventListener('click', () => {
 // Fetch Live Matches on Load and every 60 seconds
 async function fetchLiveMatches() {
     try {
-        const response = await fetch('http://localhost:8080/api/v1/matches/live');
+        const response = await fetch('https://pitchiq-production-7a44.up.railway.app/api/v1/matches/live');
         if (!response.ok) throw new Error('Live matches unavailable');
         const matches = await response.json();
         
@@ -732,7 +732,7 @@ async function fetchLiveMatches() {
                 showLoadingSequence();
                 
                 try {
-                    const detailResponse = await fetch(`http://localhost:8080/api/v1/matches/${match.id}`);
+                    const detailResponse = await fetch(`https://pitchiq-production-7a44.up.railway.app/api/v1/matches/${match.id}`);
                     if (detailResponse.ok) {
                         const detailedMatch = await detailResponse.json();
                         if (detailedMatch.scores && detailedMatch.scores.length > 0) {
@@ -900,7 +900,7 @@ async function sendAskPiMessage() {
             history: askPiHistory
         };
 
-        const response = await fetch('http://localhost:8080/api/v1/ask', {
+        const response = await fetch('https://pitchiq-production-7a44.up.railway.app/api/v1/ask', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload)
