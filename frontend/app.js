@@ -740,20 +740,9 @@ async function fetchLiveMatches() {
                 latestScore = "Match starting soon";
             }
 
-            // Generate team initials instead of relying on flags
-            const getIdentity = (name) => {
-                if (!name) return "UNK";
-                const parts = name.trim().split(" ");
-                if (parts.length > 1) {
-                    // Get first letter of first two words
-                    return (parts[0][0] + parts[1][0]).toUpperCase();
-                }
-                // If it's a single word, get first 3 letters
-                return name.substring(0, 3).toUpperCase();
-            };
-
-            const t1 = getIdentity(match.battingTeam || "T1");
-            const t2 = getIdentity(match.bowlingTeam || "T2");
+            // Use official API short names or backend-generated abbreviations
+            const t1 = match.battingTeamShort || (match.battingTeam ? match.battingTeam.substring(0, 3).toUpperCase() : "T1");
+            const t2 = match.bowlingTeamShort || (match.bowlingTeam ? match.bowlingTeam.substring(0, 3).toUpperCase() : "T2");
             
             let section = 'live'; // 'live', 'recent', 'upcoming', 'skip'
             let statusBadge = "🔴 LIVE";

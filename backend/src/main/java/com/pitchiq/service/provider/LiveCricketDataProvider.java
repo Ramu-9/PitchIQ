@@ -126,11 +126,11 @@ public class LiveCricketDataProvider implements CricketDataProvider {
                 LocalDateTime t2 = parseMatchTime(m2.getDateTimeGMT());
                 
                 if (t1 != null && t2 != null) {
-                    if (m1.isMatchEnded()) {
-                        // Completed: Newest first (Descending)
+                    if (m1.isMatchEnded() || m1.isMatchStarted()) {
+                        // Completed or Live: Newest first (Descending)
                         return t2.compareTo(t1);
                     } else {
-                        // Upcoming or Live: Earliest first (Ascending)
+                        // Upcoming: Earliest first (Ascending)
                         return t1.compareTo(t2);
                     }
                 }
@@ -326,13 +326,19 @@ public class LiveCricketDataProvider implements CricketDataProvider {
         if (!venueInfo.isMissingNode() && !venueInfo.isNull()) {
             String ground = venueInfo.path("ground").asText("").trim();
             String city = venueInfo.path("city").asText("").trim();
-            if (!ground.isEmpty() && !city.isEmpty()) {
-                venue = ground + ", " + city;
-            } else if (!ground.isEmpty()) {
-                venue = ground;
-            } else if (!city.isEmpty()) {
-                venue = city;
+            String country = venueInfo.path("country").asText("").trim();
+            
+            StringBuilder vBuilder = new StringBuilder();
+            if (!ground.isEmpty()) vBuilder.append(ground);
+            if (!city.isEmpty()) {
+                if (vBuilder.length() > 0) vBuilder.append(", ");
+                vBuilder.append(city);
             }
+            if (!country.isEmpty()) {
+                if (vBuilder.length() > 0) vBuilder.append(", ");
+                vBuilder.append(country);
+            }
+            venue = vBuilder.toString();
         }
         
         if (venue.isEmpty()) {
@@ -368,6 +374,17 @@ public class LiveCricketDataProvider implements CricketDataProvider {
             dto.setBattingTeam("Team A");
             dto.setBowlingTeam("Team B");
         }
+        
+        JsonNode teamInfo = matchNode.path("teamInfo");
+        String t1Short = "";
+        String t2Short = "";
+        if (teamInfo.isArray() && teamInfo.size() >= 2) {
+            t1Short = teamInfo.get(0).path("shortname").asText("").trim();
+            t2Short = teamInfo.get(1).path("shortname").asText("").trim();
+        }
+        
+        dto.setBattingTeamShort(t1Short.isEmpty() ? generateAbbreviation(dto.getBattingTeam()) : t1Short);
+        dto.setBowlingTeamShort(t2Short.isEmpty() ? generateAbbreviation(dto.getBowlingTeam()) : t2Short);
         
         dto.setStatus(status);
         dto.setMatchStarted(matchNode.path("matchStarted").asBoolean());
@@ -405,5 +422,51 @@ public class LiveCricketDataProvider implements CricketDataProvider {
         
         dto.setScores(scores);
         return dto;
+    }
+    private String generateAbbreviation(String teamName) {
+        if (teamName == null || teamName.isEmpty()) return "UNK";
+        String name = teamName.trim();
+        boolean isWomen = name.toLowerCase().endsWith("women") || name.toLowerCase().endsWith("w");
+        
+        // Strip "Women" or " W" for matching
+        String baseName = name.replaceAll("(?i)\\b(Women|W)\\b", "").trim();
+        
+        String abbr = "";
+        switch (baseName.toLowerCase()) {
+            case "india": abbr = "IND"; break;
+            case "australia": abbr = "AUS"; break;
+            case "england": abbr = "ENG"; break;
+            case "new zealand": abbr = "NZ"; break;
+            case "south africa": abbr = "SA"; break;
+            case "pakistan": abbr = "PAK"; break;
+            case "bangladesh": abbr = "BAN"; break;
+            case "sri lanka": abbr = "SL"; break;
+            case "west indies": abbr = "WI"; break;
+            case "afghanistan": abbr = "AFG"; break;
+            case "ireland": abbr = "IRE"; break;
+            case "zimbabwe": abbr = "ZIM"; break;
+            case "scotland": abbr = "SCO"; break;
+            case "netherlands": abbr = "NED"; break;
+            case "united arab emirates": abbr = "UAE"; break;
+            case "namibia": abbr = "NAM"; break;
+            case "nepal": abbr = "NEP"; break;
+            case "oman": abbr = "OMA"; break;
+            case "papua new guinea": abbr = "PNG"; break;
+            case "united states": case "usa": case "united states of america": abbr = "USA"; break;
+            default: 
+                // Default fallback for domestic
+                String[] parts = baseName.split(" ");
+                if (parts.length > 1) {
+                    abbr = (parts[0].substring(0, 1) + parts[1].substring(0, 1)).toUpperCase();
+                } else {
+                    abbr = baseName.length() >= 3 ? baseName.substring(0, 3).toUpperCase() : baseName.toUpperCase();
+                }
+                break;
+        }
+        
+        if (isWomen && !abbr.endsWith("-W")) {
+            abbr += "-W";
+        }
+        return abbr;
     }
 }

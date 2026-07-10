@@ -14,6 +14,8 @@ public class MatchDto {
     private boolean matchEnded;
     private String matchType;
     private String dateTimeGMT;
+    private String battingTeamShort;
+    private String bowlingTeamShort;
 
     // Getters and Setters
     public String getDateTimeGMT() { return dateTimeGMT; }
@@ -30,6 +32,10 @@ public class MatchDto {
     public void setBattingTeam(String battingTeam) { this.battingTeam = battingTeam; }
     public String getBowlingTeam() { return bowlingTeam; }
     public void setBowlingTeam(String bowlingTeam) { this.bowlingTeam = bowlingTeam; }
+    public String getBattingTeamShort() { return battingTeamShort; }
+    public void setBattingTeamShort(String battingTeamShort) { this.battingTeamShort = battingTeamShort; }
+    public String getBowlingTeamShort() { return bowlingTeamShort; }
+    public void setBowlingTeamShort(String bowlingTeamShort) { this.bowlingTeamShort = bowlingTeamShort; }
     public List<ScoreDto> getScores() { return scores; }
     public void setScores(List<ScoreDto> scores) { this.scores = scores; }
     public boolean isMatchStarted() { return matchStarted; }
