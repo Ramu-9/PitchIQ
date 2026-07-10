@@ -86,6 +86,20 @@ public class LiveCricketDataProvider implements CricketDataProvider {
             
             List<MatchDto> allMatches = new ArrayList<>(matchMap.values());
             
+            // Filter stale upcoming matches
+            LocalDateTime nowUtc = LocalDateTime.now(java.time.ZoneOffset.UTC);
+            allMatches.removeIf(match -> {
+                if (!match.isMatchStarted() && !match.isMatchEnded()) {
+                    LocalDateTime matchTime = parseMatchTime(match.getDateTimeGMT());
+                    if (matchTime != null && matchTime.isBefore(nowUtc.minusHours(24))) {
+                        log.warn("[PitchIQ] Filtering stale upcoming match: ID={}, Name={}, Time={}, Started={}, Ended={}", 
+                            match.getId(), match.getName(), match.getDateTimeGMT(), match.isMatchStarted(), match.isMatchEnded());
+                        return true;
+                    }
+                }
+                return false;
+            });
+            
             // Deterministic Sorting:
             // 1. State Priority: Live > Recent (Completed) > Upcoming
             // 2. Quality Priority: International > Major Franchise > Domestic
@@ -258,7 +272,7 @@ public class LiveCricketDataProvider implements CricketDataProvider {
                     } catch (Exception e) {}
                 }
                 dto.setStatus(status);
-                dto.setVenue("TBC, TBC"); 
+                dto.setVenue("Venue unavailable"); 
                 dto.setMatchType(matchNode.path("matchType").asText("T20").toUpperCase());
                 
                 if (status.startsWith("Match starts at ")) {
@@ -307,7 +321,29 @@ public class LiveCricketDataProvider implements CricketDataProvider {
         }
         dto.setStatus(status);
         
-        dto.setVenue(matchNode.path("venue").asText(""));
+        String venue = "";
+        JsonNode venueInfo = matchNode.path("venueInfo");
+        if (!venueInfo.isMissingNode() && !venueInfo.isNull()) {
+            String ground = venueInfo.path("ground").asText("").trim();
+            String city = venueInfo.path("city").asText("").trim();
+            if (!ground.isEmpty() && !city.isEmpty()) {
+                venue = ground + ", " + city;
+            } else if (!ground.isEmpty()) {
+                venue = ground;
+            } else if (!city.isEmpty()) {
+                venue = city;
+            }
+        }
+        
+        if (venue.isEmpty()) {
+            venue = matchNode.path("venue").asText("").trim();
+        }
+        
+        if (venue.isEmpty() || venue.equalsIgnoreCase("TBC, TBC") || venue.equalsIgnoreCase("TBC") || venue.equalsIgnoreCase("TBA")) {
+            venue = "Venue unavailable";
+        }
+        
+        dto.setVenue(venue);
         
         String matchType = matchNode.path("matchType").asText("");
         if (matchType.isEmpty()) {
