@@ -166,6 +166,15 @@ public class LiveCricketDataProvider implements CricketDataProvider {
         String t1 = (match.getBattingTeam() != null ? match.getBattingTeam() : "").toLowerCase();
         String t2 = (match.getBowlingTeam() != null ? match.getBowlingTeam() : "").toLowerCase();
         String full = name + " " + t1 + " " + t2;
+        
+        String t1Short = match.getBattingTeamShort() != null ? match.getBattingTeamShort().toUpperCase() : "";
+        String t2Short = match.getBowlingTeamShort() != null ? match.getBowlingTeamShort().toUpperCase() : "";
+        
+        java.util.Set<String> bigTeams = java.util.Set.of("IND", "AUS", "ENG", "NZ", "SA", "PAK", "IND-W", "AUS-W", "ENG-W", "NZ-W", "SA-W", "PAK-W");
+        
+        if (bigTeams.contains(t1Short) || bigTeams.contains(t2Short)) {
+            return 4; // Major International Teams
+        }
 
         // International Formats / Major Tournaments
         if (full.contains("odi") || full.contains("test") || full.contains("t20i") || 
@@ -179,7 +188,7 @@ public class LiveCricketDataProvider implements CricketDataProvider {
             full.contains("psl") || full.contains("super league") ||
             full.contains("sa20") || full.contains("the hundred") || 
             full.contains("cpl") || full.contains("caribbean") ||
-            full.contains("ilt20") || full.contains("mlc")) {
+            full.contains("ilt20") || full.contains("mlc") || full.contains("wpl")) {
             return 2;
         }
 
