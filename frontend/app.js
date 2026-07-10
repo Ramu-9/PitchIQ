@@ -3,6 +3,10 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.9.0/firebas
 import { getAnalytics, logEvent } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-analytics.js";
 import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-auth.js";
 
+const API_BASE_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
+    ? 'http://localhost:8080/api/v1' 
+    : 'https://pitchiq-production-7a44.up.railway.app/api/v1';
+
 const firebaseConfig = {
     apiKey: "AIzaSyCRCMXsIdBYMUsa8Ec17kjtV-80YFvXVNI",
     authDomain: "pitchiq-5ed39.firebaseapp.com",
@@ -470,7 +474,7 @@ document.getElementById('analyzeBtn').addEventListener('click', () => {
         const abortController = new AbortController();
         const timeoutId = setTimeout(() => abortController.abort(), 18000); // 18s timeout
 
-        const fetchPromise = fetch('https://pitchiq-production-7a44.up.railway.app/api/v1/analyze', {
+        const fetchPromise = fetch('${API_BASE_URL}/analyze', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload),
@@ -680,7 +684,7 @@ document.getElementById('analyzeBtn').addEventListener('click', () => {
 // Fetch Live Matches on Load and every 60 seconds
 async function fetchLiveMatches() {
     try {
-        const response = await fetch('https://pitchiq-production-7a44.up.railway.app/api/v1/matches/live');
+        const response = await fetch('${API_BASE_URL}/matches/live');
         if (!response.ok) throw new Error('Live matches unavailable');
         const matches = await response.json();
         
@@ -804,7 +808,7 @@ async function fetchLiveMatches() {
                 }
                 
                 try {
-                    const detailResponse = await fetch(`https://pitchiq-production-7a44.up.railway.app/api/v1/matches/${match.id}`);
+                    const detailResponse = await fetch(`${API_BASE_URL}/matches/${match.id}`);
                     if (detailResponse.ok) {
                         const detailedMatch = await detailResponse.json();
                         if (detailedMatch.scores && detailedMatch.scores.length > 0) {
@@ -995,7 +999,7 @@ async function sendAskPiMessage() {
             history: askPiHistory
         };
 
-        const response = await fetch('https://pitchiq-production-7a44.up.railway.app/api/v1/ask', {
+        const response = await fetch('${API_BASE_URL}/ask', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload)

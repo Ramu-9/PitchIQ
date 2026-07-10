@@ -235,6 +235,11 @@ public class LiveCricketDataProvider implements CricketDataProvider {
         
         List<MatchDto> matchList = new ArrayList<>();
         JsonNode root = objectMapper.readTree(response.getBody());
+        
+        if (root.has("status") && !"success".equalsIgnoreCase(root.path("status").asText())) {
+            throw new Exception("CricAPI Error: " + root.path("info").asText("Unknown"));
+        }
+        
         JsonNode data = root.path("data");
         
         if (data.isArray()) {
@@ -254,6 +259,11 @@ public class LiveCricketDataProvider implements CricketDataProvider {
         
         List<MatchDto> matchList = new ArrayList<>();
         JsonNode root = objectMapper.readTree(response.getBody());
+        
+        if (root.has("status") && !"success".equalsIgnoreCase(root.path("status").asText())) {
+            throw new Exception("CricAPI Error: " + root.path("info").asText("Unknown"));
+        }
+        
         JsonNode data = root.path("data");
         
         if (data.isArray()) {
@@ -445,11 +455,15 @@ public class LiveCricketDataProvider implements CricketDataProvider {
                 abbr = providedShortName.trim().toUpperCase();
             } else {
                 String baseName = fullTeamName.replaceAll("(?i)\\b(Women|W)\\b", "").trim();
-                String[] parts = baseName.split(" ");
-                if (parts.length > 1) {
-                    abbr = (parts[0].substring(0, 1) + parts[1].substring(0, 1)).toUpperCase();
+                if (baseName.isEmpty()) {
+                    abbr = "UNK";
                 } else {
-                    abbr = baseName.length() >= 3 ? baseName.substring(0, 3).toUpperCase() : baseName.toUpperCase();
+                    String[] parts = baseName.split("\\s+");
+                    if (parts.length > 1 && parts[0].length() > 0 && parts[1].length() > 0) {
+                        abbr = (parts[0].substring(0, 1) + parts[1].substring(0, 1)).toUpperCase();
+                    } else {
+                        abbr = baseName.length() >= 3 ? baseName.substring(0, 3).toUpperCase() : baseName.toUpperCase();
+                    }
                 }
             }
         }
