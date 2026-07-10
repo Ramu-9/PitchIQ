@@ -66,42 +66,61 @@ public class LiveCricketDataProvider implements CricketDataProvider {
 
         Map<String, MatchDto> matchMap = new java.util.LinkedHashMap<>();
         try {
-            // Fetch live/current matches (only 1 page needed to avoid wasting API)
+            // 1. Fetch live/current matches (Live and very recent)
             List<MatchDto> current = fetchAndParseList("v1/currentMatches", 0);
             for (MatchDto match : current) {
                 matchMap.put(match.getId(), match);
             }
             
-            // Fetch priority matches from cricScore (1 API hit, returns international priority matches)
+            // 2. Fetch priority upcoming matches from cricScore
             List<MatchDto> upcoming = fetchAndParseCricScoreList();
             for (MatchDto match : upcoming) {
                 matchMap.putIfAbsent(match.getId(), match);
             }
-            
+
+            // 3. Fetch general matches to ensure we have recently completed results that dropped off currentMatches
+            List<MatchDto> historical = fetchAndParseList("v1/matches", 0);
+            for (MatchDto match : historical) {
+                matchMap.putIfAbsent(match.getId(), match);
+            }
             
             List<MatchDto> allMatches = new ArrayList<>(matchMap.values());
             
-            List<String> priorityTeams = List.of("India", "Australia", "England", "South Africa", "New Zealand", "Pakistan", "Sri Lanka", "West Indies", "Bangladesh", "Afghanistan", "Zimbabwe", "Ireland", "IND", "AUS", "ENG", "SA", "NZ", "PAK", "SL", "WI", "BAN", "AFG", "ZIM", "IRE");
-            
+            // Deterministic Sorting:
+            // 1. State Priority: Live > Recent (Completed) > Upcoming
+            // 2. Quality Priority: International > Major Franchise > Domestic
+            // 3. Time Priority: 
+            //    - Recent: Newest first
+            //    - Upcoming: Earliest first
             allMatches.sort((m1, m2) -> {
-                boolean m1Priority = priorityTeams.stream().anyMatch(t -> (m1.getBattingTeam() != null && m1.getBattingTeam().contains(t)) || (m1.getBowlingTeam() != null && m1.getBowlingTeam().contains(t)) || (m1.getName() != null && m1.getName().contains(t)));
-                boolean m2Priority = priorityTeams.stream().anyMatch(t -> (m2.getBattingTeam() != null && m2.getBattingTeam().contains(t)) || (m2.getBowlingTeam() != null && m2.getBowlingTeam().contains(t)) || (m2.getName() != null && m2.getName().contains(t)));
+                int score1 = calculateStateScore(m1);
+                int score2 = calculateStateScore(m2);
                 
-                if (m1Priority && !m2Priority) return -1;
-                if (!m1Priority && m2Priority) return 1;
-                
-                // Chronological sort
-                if (m1.getDateTimeGMT() != null && m2.getDateTimeGMT() != null) {
-                    try {
-                        LocalDateTime t1 = LocalDateTime.parse(m1.getDateTimeGMT());
-                        LocalDateTime t2 = LocalDateTime.parse(m2.getDateTimeGMT());
-                        return t1.compareTo(t2);
-                    } catch (Exception e) {
-                        return 0;
-                    }
+                if (score1 != score2) {
+                    return Integer.compare(score2, score1); // Descending (higher score first)
                 }
                 
-                return 0; // Stable fallback
+                int q1 = calculateQualityScore(m1);
+                int q2 = calculateQualityScore(m2);
+                
+                if (q1 != q2) {
+                    return Integer.compare(q2, q1); // Descending
+                }
+                
+                // Chronological fallback based on state
+                LocalDateTime t1 = parseMatchTime(m1.getDateTimeGMT());
+                LocalDateTime t2 = parseMatchTime(m2.getDateTimeGMT());
+                
+                if (t1 != null && t2 != null) {
+                    if (m1.isMatchEnded()) {
+                        // Completed: Newest first (Descending)
+                        return t2.compareTo(t1);
+                    } else {
+                        // Upcoming or Live: Earliest first (Ascending)
+                        return t1.compareTo(t2);
+                    }
+                }
+                return 0;
             });
             
             liveMatchesCache.put("LIVE_LIST", new CacheEntry<>(allMatches));
@@ -111,7 +130,54 @@ public class LiveCricketDataProvider implements CricketDataProvider {
             if (entry != null) {
                 return entry.data;
             }
-            return new ArrayList<>(); // Return empty instead of throwing to prevent 500 error cascade
+            return new ArrayList<>();
+        }
+    }
+
+    private int calculateStateScore(MatchDto match) {
+        boolean isStumps = match.getStatus() != null && 
+            (match.getStatus().toLowerCase().contains("stump") || match.getStatus().toLowerCase().contains("day "));
+            
+        if (!match.isMatchEnded() && (match.isMatchStarted() || isStumps)) {
+            return 3; // LIVE
+        } else if (match.isMatchEnded()) {
+            return 2; // RECENT
+        } else {
+            return 1; // UPCOMING
+        }
+    }
+
+    private int calculateQualityScore(MatchDto match) {
+        String name = (match.getName() != null ? match.getName() : "").toLowerCase();
+        String t1 = (match.getBattingTeam() != null ? match.getBattingTeam() : "").toLowerCase();
+        String t2 = (match.getBowlingTeam() != null ? match.getBowlingTeam() : "").toLowerCase();
+        String full = name + " " + t1 + " " + t2;
+
+        // International Formats / Major Tournaments
+        if (full.contains("odi") || full.contains("test") || full.contains("t20i") || 
+            full.contains("world cup") || full.contains("champions trophy") || full.contains("asia cup")) {
+            return 3; 
+        }
+        
+        // Major Franchise Leagues
+        if (full.contains("ipl") || full.contains("indian premier league") || 
+            full.contains("bbl") || full.contains("big bash") || 
+            full.contains("psl") || full.contains("super league") ||
+            full.contains("sa20") || full.contains("the hundred") || 
+            full.contains("cpl") || full.contains("caribbean") ||
+            full.contains("ilt20") || full.contains("mlc")) {
+            return 2;
+        }
+
+        return 1; // Domestic / Other
+    }
+
+    private LocalDateTime parseMatchTime(String timeGMT) {
+        if (timeGMT == null || timeGMT.isEmpty()) return null;
+        try {
+            return LocalDateTime.parse(timeGMT);
+        } catch (Exception e) {
+            return null;
         }
     }
 

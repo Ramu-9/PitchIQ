@@ -338,6 +338,9 @@ document.getElementById('matchFormat').addEventListener('change', () => {
     document.getElementById('validationMessage').style.display = 'none';
 });
 
+let _loadingEllipsisInterval = null;
+let _loadingSafetyTimeout = null;
+
 function showLoadingSequence() {
     // Legacy function used by live match card click
     const overlay = document.getElementById('loadingOverlay');
@@ -354,6 +357,9 @@ function showLoadingSequence() {
 }
 
 function hideLoadingSequence() {
+    // Clear any animated ellipsis interval
+    if (_loadingEllipsisInterval) { clearInterval(_loadingEllipsisInterval); _loadingEllipsisInterval = null; }
+    if (_loadingSafetyTimeout) { clearTimeout(_loadingSafetyTimeout); _loadingSafetyTimeout = null; }
     const overlay = document.getElementById('loadingOverlay');
     overlay.style.opacity = '0';
     setTimeout(() => { 
@@ -429,12 +435,15 @@ document.getElementById('analyzeBtn').addEventListener('click', () => {
         overlay.style.opacity = '1';
 
         // Stage 1: Initializing
-        text.textContent = "Initializing Simulation...";
+        text.textContent = "Preparing Simulation";
         fill.style.width = "15%";
-        await new Promise(r => setTimeout(r, 300));
+        await new Promise(r => setTimeout(r, 200));
+
+        // Scroll into view so user sees the analytics section
+        document.getElementById('hud').scrollIntoView({ behavior: 'smooth', block: 'start' });
 
         // Stage 2: Running Simulations
-        text.textContent = "Running 10,000 Monte Carlo Simulations...";
+        text.textContent = "Running Monte Carlo...";
         fill.style.width = "40%";
         
         // Start backend request concurrently with counter animation
@@ -472,12 +481,12 @@ document.getElementById('analyzeBtn').addEventListener('click', () => {
             return res.json();
         }).catch(e => {
             console.warn("Fetch failed or timed out", e);
-            return { // Fallback data
-                winProbability: 0.73,
-                projectedScore: 195,
-                expectedRunsRemaining: 75,
-                requiredRunRate: 9.6,
-                momentumMeter: 0.8,
+            return { // Graceful degradation — no fake data
+                winProbability: 0,
+                projectedScore: 0,
+                expectedRunsRemaining: 0,
+                requiredRunRate: 0,
+                momentumMeter: 0,
                 aiCommentary: ["AI intelligence temporarily unavailable."]
             };
         });
@@ -512,23 +521,38 @@ document.getElementById('analyzeBtn').addEventListener('click', () => {
         await new Promise(r => setTimeout(r, 200));
 
         // Stage 3: Computing Match Probabilities & Waiting for AI
-        text.textContent = "Computing Match Probabilities...";
         fill.style.width = "70%";
-        
+        // Animate the stage text to show continuous progress while waiting for API
+        let _dots = 0;
+        const _baseText = "Generating AI Intelligence";
+        text.textContent = _baseText + "...";
+        _loadingEllipsisInterval = setInterval(() => {
+            _dots = (_dots + 1) % 4;
+            text.textContent = _baseText + ".".repeat(_dots || 1);
+        }, 400);
+
+        // Safety timeout: force-hide overlay after 25s to prevent permanent hang
+        _loadingSafetyTimeout = setTimeout(() => {
+            console.warn('[PitchIQ] Safety timeout — forcing overlay hide.');
+            hideLoadingSequence();
+        }, 25000);
+
         // Now wait for fetch to complete if it hasn't already
         const data = await fetchPromise;
+        // Clear ellipsis once data is received
+        if (_loadingEllipsisInterval) { clearInterval(_loadingEllipsisInterval); _loadingEllipsisInterval = null; }
 
         // Stage 4: AI Intelligence (Skip if not present)
         if (data.aiCommentary && data.aiCommentary.length > 0) {
-            text.textContent = "Generating PitchIQ Intelligence...";
+            text.textContent = "Formatting Match Insights...";
             fill.style.width = "90%";
             await new Promise(r => setTimeout(r, 300));
         }
 
         // Stage 5: Rendering Dashboard
-        text.textContent = "Rendering Analytics Dashboard...";
+        text.textContent = "Rendering Dashboard";
         fill.style.width = "100%";
-        await new Promise(r => setTimeout(r, 200));
+        await new Promise(r => setTimeout(r, 300));
 
         // Hide Overlay (Handled in finally block, but we fade out here)
         overlay.style.opacity = '0';
@@ -737,18 +761,10 @@ async function fetchLiveMatches() {
             let isStumps = match.status && (match.status.toLowerCase().includes('stump') || match.status.toLowerCase().includes('day '));
 
             if (match.matchEnded) {
-                if (match.dateTimeGMT) {
-                    let gmtStr = match.dateTimeGMT.endsWith('Z') ? match.dateTimeGMT : match.dateTimeGMT + 'Z';
-                    let matchDateStr = new Date(gmtStr).toLocaleDateString();
-                    if (matchDateStr === targetDateStr) {
-                        section = 'recent';
-                        statusBadge = "📝 COMPLETED";
-                    } else {
-                        section = 'skip';
-                    }
-                } else {
-                    section = 'skip';
-                }
+                // Show completed matches as recent. 
+                // We'll limit the total recent matches rendered to a reasonable number below.
+                section = 'recent';
+                statusBadge = "📝 COMPLETED";
             } else if (match.matchStarted || isStumps) {
                 section = 'live';
                 statusBadge = "🔴 LIVE";
@@ -797,9 +813,6 @@ async function fetchLiveMatches() {
                 if (manualModeToggle.checked) {
                     manualModeToggle.click();
                 }
-
-                // Show loading immediately
-                showLoadingSequence();
                 
                 try {
                     const detailResponse = await fetch(`https://pitchiq-production-7a44.up.railway.app/api/v1/matches/${match.id}`);
@@ -853,7 +866,6 @@ async function fetchLiveMatches() {
                 
                 window.currentMatchId = match.id;
                 logEvent(analytics, 'select_live_match');
-                hideLoadingSequence();
 
                 // Automatically trigger the full analysis flow
                 // This programmatically clicks the analyze button which

@@ -88,11 +88,20 @@ public class GeminiAiCommentaryProvider implements AiCommentaryProvider {
                 : venueRepository.findByVenueNameIgnoreCase(venueName.trim());
 
         if (cached.isPresent()) {
-            // ── CACHE HIT: Venue already in DB — ONE call for insights only ──
-            log.info("[PitchIQ] Cache HIT for venue '{}'. Generating fresh insights only.", venueName);
             VenueIntelligenceDto venueDto = mapEntityToDto(cached.get());
-            List<String> insights = callGeminiForInsightsOnly(request, simState, venueDto);
-            return new CombinedIntelligenceResult(venueDto, insights);
+            log.info("[PitchIQ] Cache check for venueName received: '{}', cached name: '{}', groundName: '{}', city: '{}'", 
+                    venueName, cached.get().getVenueName(), venueDto.getGroundName(), venueDto.getCity());
+            
+            if (isRealVenueData(venueDto)) {
+                // ── CACHE HIT: Venue already in DB AND valid — ONE call for insights only ──
+                log.info("[PitchIQ] Cache HIT for venue '{}'. Generating fresh insights only.", venueName);
+                List<String> insights = callGeminiForInsightsOnly(request, simState, venueDto);
+                return new CombinedIntelligenceResult(venueDto, insights);
+            } else {
+                // ── CACHE HIT but INVALID (Generic Data) ──
+                log.warn("[PitchIQ] Cache HIT for venue '{}' but data is generic/invalid. Deleting row and forcing cache MISS.", venueName);
+                venueRepository.delete(cached.get());
+            }
         }
 
         // ── CACHE MISS: ONE call for venue + insights combined ──
@@ -101,6 +110,9 @@ public class GeminiAiCommentaryProvider implements AiCommentaryProvider {
 
         // Cache venue ONLY if it's a real Gemini response (not fallback)
         VenueIntelligenceDto venueDto = result.getVenueIntelligence();
+        log.info("[PitchIQ] Gemini Response Venue -> groundName: '{}', city: '{}', pitchType: '{}'", 
+                venueDto.getGroundName(), venueDto.getCity(), venueDto.getPitchType());
+                
         if (!venueUnknown && venueDto != null && isRealVenueData(venueDto)) {
             try {
                 VenueIntelligence entity = mapDtoToEntity(venueDto, venueName);
@@ -129,7 +141,14 @@ public class GeminiAiCommentaryProvider implements AiCommentaryProvider {
                 String rawJson = callGeminiApi(prompt);
                 String text = extractAndCleanText(rawJson);
                 log.debug("[PitchIQ] Combined Gemini raw text: {}", text.substring(0, Math.min(200, text.length())));
-                return parseCombinedResponse(text);
+                CombinedIntelligenceResult parsed = parseCombinedResponse(text);
+                VenueIntelligenceDto parsedVenue = parsed.getVenueIntelligence();
+                log.info("[PitchIQ] Parsed venue — ground: '{}', city: '{}', pitch: '{}', avg1st: '{}'",
+                        parsedVenue != null ? parsedVenue.getGroundName() : "null",
+                        parsedVenue != null ? parsedVenue.getCity() : "null",
+                        parsedVenue != null ? parsedVenue.getPitchType() : "null",
+                        parsedVenue != null ? parsedVenue.getAverageFirstInningsScore() : "null");
+                return parsed;
             } catch (Exception e) {
                 log.warn("[PitchIQ] Combined Gemini call attempt {}/{} failed: {}", attempt, MAX_RETRIES,
                         e.getMessage());
@@ -179,8 +198,15 @@ public class GeminiAiCommentaryProvider implements AiCommentaryProvider {
                 .append(" | Format: ").append(format)
                 .append(" | Status: ").append(status.toUpperCase()).append("\n");
         sb.append(buildMatchContext(request, sim, status)).append("\n");
-        sb.append("Return this exact JSON structure (fill all string fields with real cricket data for ").append(venue)
-                .append("):\n");
+        sb.append("IMPORTANT: For the venue object, use REAL cricket data specific to ").append(venue).append(".\n");
+        sb.append("- groundName: the official ground name (e.g. 'M. Chinnaswamy Stadium')\n");
+        sb.append("- city: the actual city (e.g. 'Bengaluru')\n");
+        sb.append("- pitchType: specific description (e.g. 'Flat batting track with late turn')\n");
+        sb.append("- averageFirstInningsScore: a real number (e.g. '168')\n");
+        sb.append("- highestSuccessfulChase: a real number (e.g. '206')\n");
+        sb.append("- Do NOT use generic words like 'Balanced', 'Average', 'Medium', 'Good', 'Moderate', 'High'.\n");
+        sb.append("- Every field must contain specific factual data for this venue.\n");
+        sb.append("Return this exact JSON structure:\n");
         sb.append("{\"venue\":{");
         sb.append(
                 "\"groundName\":\"\",\"city\":\"\",\"pitchType\":\"\",\"battingRating\":\"\",\"bowlingRating\":\"\",");
@@ -210,6 +236,7 @@ public class GeminiAiCommentaryProvider implements AiCommentaryProvider {
                 .append(". Avg 1st innings: ").append(venue.getAverageFirstInningsScore())
                 .append(". ").append(venue.getHistoricalTrend()).append("\n");
         sb.append(buildMatchContext(request, sim, status)).append("\n");
+        sb.append("CRITICAL: You MUST explicitly reference the exact team names, RRR (Required Run Rate), Win Probability, and target score in your insights. Provide hyper-specific tactical advice for the very next over based on this data. Do NOT provide generic cricket advice.\n");
         sb.append("Return: [\"insight1\",\"insight2\",\"insight3\",\"insight4\",\"insight5\"]");
         return sb.toString();
     }
@@ -361,9 +388,24 @@ public class GeminiAiCommentaryProvider implements AiCommentaryProvider {
         if (dto == null)
             return false;
         String name = dto.getGroundName();
-        return name != null && !name.trim().isEmpty()
-                && !"Unknown".equalsIgnoreCase(name.trim())
-                && !"N/A".equalsIgnoreCase(name.trim());
+        if (name == null || name.trim().isEmpty()
+                || "Unknown".equalsIgnoreCase(name.trim())
+                || "N/A".equalsIgnoreCase(name.trim())) {
+            return false;
+        }
+        // Also reject if city is missing — a real venue always has a city
+        String city = dto.getCity();
+        if (city == null || city.trim().isEmpty()
+                || "N/A".equalsIgnoreCase(city.trim())) {
+            return false;
+        }
+        // Reject if average first innings score looks like a placeholder
+        String avg = dto.getAverageFirstInningsScore();
+        if (avg == null || avg.trim().isEmpty()
+                || "N/A".equalsIgnoreCase(avg.trim())) {
+            return false;
+        }
+        return true;
     }
 
     private CombinedIntelligenceResult fallback() {
