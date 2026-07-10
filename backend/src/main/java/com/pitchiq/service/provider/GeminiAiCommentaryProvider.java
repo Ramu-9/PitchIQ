@@ -19,7 +19,7 @@ import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
-
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -29,8 +29,9 @@ import java.util.Optional;
 /**
  * Production Gemini AI provider.
  * Makes ONE Gemini call per match open:
- *   - If venue NOT cached: returns {"venue":{...}, "insights":[...]} → caches venue in PostgreSQL
- *   - If venue IS cached:  returns ["insight1", ...] → uses cached venue data
+ * - If venue NOT cached: returns {"venue":{...}, "insights":[...]} → caches
+ * venue in PostgreSQL
+ * - If venue IS cached: returns ["insight1", ...] → uses cached venue data
  * Never caches fallback/mock data.
  */
 @Service
@@ -42,8 +43,7 @@ public class GeminiAiCommentaryProvider implements AiCommentaryProvider {
     @Value("${gemini.api.key}")
     private String apiKey;
 
-    private static final String GEMINI_API_URL =
-            "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent?key=";
+    private static final String GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent?key=";
     private static final int MAX_RETRIES = 2;
 
     private final RestTemplate restTemplate;
@@ -52,7 +52,7 @@ public class GeminiAiCommentaryProvider implements AiCommentaryProvider {
     public GeminiAiCommentaryProvider() {
         SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
         factory.setConnectTimeout(5000); // 5 seconds
-        factory.setReadTimeout(15000);   // 15 seconds
+        factory.setReadTimeout(15000); // 15 seconds
         this.restTemplate = new RestTemplate(factory);
     }
 
@@ -131,7 +131,8 @@ public class GeminiAiCommentaryProvider implements AiCommentaryProvider {
                 log.debug("[PitchIQ] Combined Gemini raw text: {}", text.substring(0, Math.min(200, text.length())));
                 return parseCombinedResponse(text);
             } catch (Exception e) {
-                log.warn("[PitchIQ] Combined Gemini call attempt {}/{} failed: {}", attempt, MAX_RETRIES, e.getMessage());
+                log.warn("[PitchIQ] Combined Gemini call attempt {}/{} failed: {}", attempt, MAX_RETRIES,
+                        e.getMessage());
             }
         }
         log.error("[PitchIQ] All combined Gemini attempts failed — using fallback.");
@@ -142,16 +143,19 @@ public class GeminiAiCommentaryProvider implements AiCommentaryProvider {
      * ONE Gemini call when venue IS cached.
      * Prompt asks for match insights only (venue context provided inline).
      */
-    private List<String> callGeminiForInsightsOnly(MatchStateRequest request, SimulationResponse sim, VenueIntelligenceDto venue) {
+    private List<String> callGeminiForInsightsOnly(MatchStateRequest request, SimulationResponse sim,
+            VenueIntelligenceDto venue) {
         String prompt = buildInsightsOnlyPrompt(request, sim, venue);
         for (int attempt = 1; attempt <= MAX_RETRIES; attempt++) {
             try {
                 String rawJson = callGeminiApi(prompt);
                 String text = extractAndCleanText(rawJson);
-                log.debug("[PitchIQ] Insights-only Gemini raw text: {}", text.substring(0, Math.min(200, text.length())));
+                log.debug("[PitchIQ] Insights-only Gemini raw text: {}",
+                        text.substring(0, Math.min(200, text.length())));
                 return parseInsightsArray(text);
             } catch (Exception e) {
-                log.warn("[PitchIQ] Insights Gemini call attempt {}/{} failed: {}", attempt, MAX_RETRIES, e.getMessage());
+                log.warn("[PitchIQ] Insights Gemini call attempt {}/{} failed: {}", attempt, MAX_RETRIES,
+                        e.getMessage());
             }
         }
         log.error("[PitchIQ] All insights Gemini attempts failed — using fallback bullets.");
@@ -168,37 +172,43 @@ public class GeminiAiCommentaryProvider implements AiCommentaryProvider {
         String format = nvl(request.getMatchFormat(), "t20").toUpperCase();
 
         StringBuilder sb = new StringBuilder();
-        sb.append("You are a cricket intelligence analyst. Return ONLY raw JSON with no markdown, no code fences, no explanation.\n");
+        sb.append(
+                "You are a cricket intelligence analyst. Return ONLY raw JSON with no markdown, no code fences, no explanation.\n");
         sb.append("Match: ").append(t1).append(" vs ").append(t2)
-          .append(" | Venue: ").append(venue)
-          .append(" | Format: ").append(format)
-          .append(" | Status: ").append(status.toUpperCase()).append("\n");
+                .append(" | Venue: ").append(venue)
+                .append(" | Format: ").append(format)
+                .append(" | Status: ").append(status.toUpperCase()).append("\n");
         sb.append(buildMatchContext(request, sim, status)).append("\n");
-        sb.append("Return this exact JSON structure (fill all string fields with real cricket data for ").append(venue).append("):\n");
+        sb.append("Return this exact JSON structure (fill all string fields with real cricket data for ").append(venue)
+                .append("):\n");
         sb.append("{\"venue\":{");
-        sb.append("\"groundName\":\"\",\"city\":\"\",\"pitchType\":\"\",\"battingRating\":\"\",\"bowlingRating\":\"\",");
-        sb.append("\"spinSupport\":\"\",\"paceSupport\":\"\",\"averageFirstInningsScore\":\"\",\"highestSuccessfulChase\":\"\",");
+        sb.append(
+                "\"groundName\":\"\",\"city\":\"\",\"pitchType\":\"\",\"battingRating\":\"\",\"bowlingRating\":\"\",");
+        sb.append(
+                "\"spinSupport\":\"\",\"paceSupport\":\"\",\"averageFirstInningsScore\":\"\",\"highestSuccessfulChase\":\"\",");
         sb.append("\"boundarySize\":\"\",\"dewFactor\":\"\",\"tossAdvantage\":\"\",\"historicalTrend\":\"\",");
         sb.append("\"recommendedStrategy\":\"\",\"shortSummary\":\"\"");
         sb.append("},\"insights\":[\"insight1\",\"insight2\",\"insight3\",\"insight4\",\"insight5\"]}");
         return sb.toString();
     }
 
-    private String buildInsightsOnlyPrompt(MatchStateRequest request, SimulationResponse sim, VenueIntelligenceDto venue) {
+    private String buildInsightsOnlyPrompt(MatchStateRequest request, SimulationResponse sim,
+            VenueIntelligenceDto venue) {
         String status = nvl(request.getMatchStatus(), "live").toLowerCase();
         String t1 = nvl(request.getBattingTeamName(), "Team A");
         String t2 = nvl(request.getBowlingTeamName(), "Team B");
         String format = nvl(request.getMatchFormat(), "t20").toUpperCase();
 
         StringBuilder sb = new StringBuilder();
-        sb.append("You are a cricket intelligence analyst. Return ONLY a raw JSON array of exactly 5 concise insight strings, no markdown.\n");
+        sb.append(
+                "You are a cricket intelligence analyst. Return ONLY a raw JSON array of exactly 5 concise insight strings, no markdown.\n");
         sb.append("Match: ").append(t1).append(" vs ").append(t2)
-          .append(" | Format: ").append(format)
-          .append(" | Status: ").append(status.toUpperCase()).append("\n");
+                .append(" | Format: ").append(format)
+                .append(" | Status: ").append(status.toUpperCase()).append("\n");
         sb.append("Venue context: ").append(venue.getGroundName()).append(", ").append(venue.getCity())
-          .append(". Pitch: ").append(venue.getPitchType())
-          .append(". Avg 1st innings: ").append(venue.getAverageFirstInningsScore())
-          .append(". ").append(venue.getHistoricalTrend()).append("\n");
+                .append(". Pitch: ").append(venue.getPitchType())
+                .append(". Avg 1st innings: ").append(venue.getAverageFirstInningsScore())
+                .append(". ").append(venue.getHistoricalTrend()).append("\n");
         sb.append(buildMatchContext(request, sim, status)).append("\n");
         sb.append("Return: [\"insight1\",\"insight2\",\"insight3\",\"insight4\",\"insight5\"]");
         return sb.toString();
@@ -209,7 +219,7 @@ public class GeminiAiCommentaryProvider implements AiCommentaryProvider {
             return "Pre-match — no score yet. Generate pre-match predictions and strategy insights.";
         } else if ("completed".equals(status)) {
             return "Final: " + request.getCurrentRuns() + "/" + request.getCurrentWickets()
-                   + ". Target was: " + request.getTargetScore() + ". Generate post-match analysis.";
+                    + ". Target was: " + request.getTargetScore() + ". Generate post-match analysis.";
         } else {
             double rrr = (sim != null) ? sim.getRequiredRunRate() : 0;
             double wp = (sim != null) ? sim.getWinProbability() * 100 : 50;
@@ -226,7 +236,8 @@ public class GeminiAiCommentaryProvider implements AiCommentaryProvider {
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
 
-        // Use ObjectMapper to safely build the JSON request body (handles escaping correctly)
+        // Use ObjectMapper to safely build the JSON request body (handles escaping
+        // correctly)
         Map<String, Object> part = new HashMap<>();
         part.put("text", prompt);
         Map<String, Object> content = new HashMap<>();
@@ -243,7 +254,8 @@ public class GeminiAiCommentaryProvider implements AiCommentaryProvider {
         JsonNode root = objectMapper.readTree(geminiJsonResponse);
         JsonNode candidates = root.path("candidates");
         if (!candidates.isArray() || candidates.isEmpty()) {
-            throw new RuntimeException("Gemini response has no candidates: " + geminiJsonResponse.substring(0, Math.min(300, geminiJsonResponse.length())));
+            throw new RuntimeException("Gemini response has no candidates: "
+                    + geminiJsonResponse.substring(0, Math.min(300, geminiJsonResponse.length())));
         }
         String text = candidates.get(0).path("content").path("parts").get(0).path("text").asText();
         // Strip markdown code fences that Gemini may add despite instructions
@@ -264,7 +276,8 @@ public class GeminiAiCommentaryProvider implements AiCommentaryProvider {
         if (insightsNode.isArray()) {
             for (JsonNode n : insightsNode) {
                 String s = n.asText().trim();
-                if (!s.isEmpty()) insights.add(s);
+                if (!s.isEmpty())
+                    insights.add(s);
             }
         }
         if (insights.isEmpty()) {
@@ -281,7 +294,8 @@ public class GeminiAiCommentaryProvider implements AiCommentaryProvider {
         if (arrayNode.isArray()) {
             for (JsonNode n : arrayNode) {
                 String s = n.asText().trim();
-                if (!s.isEmpty()) insights.add(s);
+                if (!s.isEmpty())
+                    insights.add(s);
             }
         }
         if (insights.isEmpty()) {
@@ -344,7 +358,8 @@ public class GeminiAiCommentaryProvider implements AiCommentaryProvider {
      * Prevents caching fallback/empty/placeholder responses.
      */
     private boolean isRealVenueData(VenueIntelligenceDto dto) {
-        if (dto == null) return false;
+        if (dto == null)
+            return false;
         String name = dto.getGroundName();
         return name != null && !name.trim().isEmpty()
                 && !"Unknown".equalsIgnoreCase(name.trim())

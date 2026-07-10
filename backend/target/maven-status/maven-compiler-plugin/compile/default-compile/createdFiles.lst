@@ -1,7 +1,9 @@
 com\pitchiq\engine\etl\ModelValidator$PredictionRecord.class
 com\pitchiq\service\provider\GeminiAiCommentaryProvider.class
 com\pitchiq\service\AskPiService.class
+com\pitchiq\repository\VenueIntelligenceRepository.class
 com\pitchiq\service\provider\LiveCricketDataProvider.class
+com\pitchiq\entity\VenueIntelligence.class
 com\pitchiq\repository\SimulationHistoryRepository.class
 com\pitchiq\dto\AskPiRequest.class
 com\pitchiq\dto\ScoreDto.class
@@ -19,6 +21,7 @@ com\pitchiq\dto\AskPiResponse.class
 com\pitchiq\engine\etl\CricsheetMatch$Info.class
 com\pitchiq\controller\AskPiController.class
 com\pitchiq\controller\CricketController.class
+com\pitchiq\config\CorsConfig.class
 com\pitchiq\dto\MatchDto.class
 com\pitchiq\entity\Venue.class
 com\pitchiq\repository\TeamRepository.class
@@ -27,7 +30,7 @@ com\pitchiq\engine\etl\EtlMain.class
 com\pitchiq\engine\etl\DatabaseSeeder.class
 com\pitchiq\service\AiCommentaryService.class
 com\pitchiq\service\SimulationService.class
-com\pitchiq\service\provider\MockAiCommentaryProvider.class
+com\pitchiq\config\CorsConfig$1.class
 com\pitchiq\service\provider\MockCricketDataProvider.class
 com\pitchiq\engine\Main.class
 com\pitchiq\repository\VenueOutcomeProfileRepository.class
@@ -37,12 +40,14 @@ com\pitchiq\service\provider\AiCommentaryProvider.class
 com\pitchiq\engine\etl\CricsheetMatch$InningsWrapper.class
 com\pitchiq\entity\VenueOutcomeProfile.class
 com\pitchiq\service\CricketService.class
+com\pitchiq\dto\VenueIntelligenceDto.class
 com\pitchiq\engine\BallOutcome.class
 com\pitchiq\engine\etl\CricsheetMatch.class
 com\pitchiq\dto\MatchStateRequest.class
 com\pitchiq\engine\MatchState.class
 com\pitchiq\engine\etl\CricsheetMatch$Outcome.class
 com\pitchiq\engine\SimulationResult.class
+com\pitchiq\dto\CombinedIntelligenceResult.class
 com\pitchiq\engine\etl\CricsheetMatch$Over.class
 com\pitchiq\dto\AskPiRequest$Message.class
 com\pitchiq\dto\SimulationResponse.class

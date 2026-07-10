@@ -1,7 +1,6 @@
 C:\Users\hp\Desktop\PitchIq\backend\src\main\java\com\pitchiq\dto\ScoreDto.java
 C:\Users\hp\Desktop\PitchIq\backend\src\main\java\com\pitchiq\controller\CricketController.java
 C:\Users\hp\Desktop\PitchIq\backend\src\main\java\com\pitchiq\service\provider\MockCricketDataProvider.java
-C:\Users\hp\Desktop\PitchIq\backend\src\main\java\com\pitchiq\service\provider\MockAiCommentaryProvider.java
 C:\Users\hp\Desktop\PitchIq\backend\src\main\java\com\pitchiq\engine\MatchState.java
 C:\Users\hp\Desktop\PitchIq\backend\src\main\java\com\pitchiq\entity\Team.java
 C:\Users\hp\Desktop\PitchIq\backend\src\main\java\com\pitchiq\engine\etl\DatabaseSeeder.java
@@ -10,15 +9,19 @@ C:\Users\hp\Desktop\PitchIq\backend\src\main\java\com\pitchiq\engine\SimulationR
 C:\Users\hp\Desktop\PitchIq\backend\src\main\java\com\pitchiq\dto\SimulationResponse.java
 C:\Users\hp\Desktop\PitchIq\backend\src\main\java\com\pitchiq\engine\ProbabilityDistribution.java
 C:\Users\hp\Desktop\PitchIq\backend\src\main\java\com\pitchiq\service\CricketService.java
+C:\Users\hp\Desktop\PitchIq\backend\src\main\java\com\pitchiq\dto\VenueIntelligenceDto.java
 C:\Users\hp\Desktop\PitchIq\backend\src\main\java\com\pitchiq\service\provider\GeminiAiCommentaryProvider.java
+C:\Users\hp\Desktop\PitchIq\backend\src\main\java\com\pitchiq\dto\CombinedIntelligenceResult.java
 C:\Users\hp\Desktop\PitchIq\backend\src\main\java\com\pitchiq\service\provider\AiCommentaryProvider.java
 C:\Users\hp\Desktop\PitchIq\backend\src\main\java\com\pitchiq\engine\Main.java
+C:\Users\hp\Desktop\PitchIq\backend\src\main\java\com\pitchiq\entity\VenueIntelligence.java
 C:\Users\hp\Desktop\PitchIq\backend\src\main\java\com\pitchiq\entity\VenueOutcomeProfile.java
 C:\Users\hp\Desktop\PitchIq\backend\src\main\java\com\pitchiq\dto\MatchDto.java
 C:\Users\hp\Desktop\PitchIq\backend\src\main\java\com\pitchiq\engine\etl\CricsheetParser.java
 C:\Users\hp\Desktop\PitchIq\backend\src\main\java\com\pitchiq\controller\AskPiController.java
 C:\Users\hp\Desktop\PitchIq\backend\src\main\java\com\pitchiq\repository\VenueRepository.java
 C:\Users\hp\Desktop\PitchIq\backend\src\main\java\com\pitchiq\service\provider\LiveCricketDataProvider.java
+C:\Users\hp\Desktop\PitchIq\backend\src\main\java\com\pitchiq\config\CorsConfig.java
 C:\Users\hp\Desktop\PitchIq\backend\src\main\java\com\pitchiq\engine\MonteCarloSimulator.java
 C:\Users\hp\Desktop\PitchIq\backend\src\main\java\com\pitchiq\engine\etl\CricsheetMatch.java
 C:\Users\hp\Desktop\PitchIq\backend\src\main\java\com\pitchiq\engine\etl\EtlMain.java
@@ -38,3 +41,4 @@ C:\Users\hp\Desktop\PitchIq\backend\src\main\java\com\pitchiq\engine\BallOutcome
 C:\Users\hp\Desktop\PitchIq\backend\src\main\java\com\pitchiq\PitchIqApplication.java
 C:\Users\hp\Desktop\PitchIq\backend\src\main\java\com\pitchiq\dto\MatchStateRequest.java
 C:\Users\hp\Desktop\PitchIq\backend\src\main\java\com\pitchiq\controller\SimulationController.java
+C:\Users\hp\Desktop\PitchIq\backend\src\main\java\com\pitchiq\repository\VenueIntelligenceRepository.java
