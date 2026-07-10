@@ -9,7 +9,6 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/v1/matches")
-@CrossOrigin(origins = "${pitchiq.cors.origins:*}")
 public class CricketController {
 
     private final CricketService cricketService;

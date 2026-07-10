@@ -8,7 +8,6 @@ import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/v1")
-@CrossOrigin(origins = "${pitchiq.cors.origins:*}")
 public class AskPiController {
 
     private final AskPiService askPiService;

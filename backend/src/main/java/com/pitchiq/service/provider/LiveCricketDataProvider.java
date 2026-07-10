@@ -24,7 +24,7 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 @Service
-@ConditionalOnProperty(name = "pitchiq.cricket.provider", havingValue = "cricapi")
+@ConditionalOnProperty(name = "pitchiq.cricket.provider", havingValue = "live")
 public class LiveCricketDataProvider implements CricketDataProvider {
 
     private static final Logger log = LoggerFactory.getLogger(LiveCricketDataProvider.class);

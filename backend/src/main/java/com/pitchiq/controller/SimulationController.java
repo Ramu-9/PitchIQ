@@ -9,7 +9,6 @@ import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/v1")
-@CrossOrigin(origins = "${pitchiq.cors.origins:*}") // For frontend integration
 public class SimulationController {
 
     private final SimulationService simulationService;

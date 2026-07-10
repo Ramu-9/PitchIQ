@@ -34,6 +34,7 @@ import java.util.Optional;
  * Never caches fallback/mock data.
  */
 @Service
+@ConditionalOnProperty(name = "pitchiq.ai.provider", havingValue = "gemini")
 public class GeminiAiCommentaryProvider implements AiCommentaryProvider {
 
     private static final Logger log = LoggerFactory.getLogger(GeminiAiCommentaryProvider.class);
