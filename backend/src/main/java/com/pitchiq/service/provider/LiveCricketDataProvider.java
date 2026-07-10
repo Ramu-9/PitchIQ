@@ -383,8 +383,8 @@ public class LiveCricketDataProvider implements CricketDataProvider {
             t2Short = teamInfo.get(1).path("shortname").asText("").trim();
         }
         
-        dto.setBattingTeamShort(t1Short.isEmpty() ? generateAbbreviation(dto.getBattingTeam()) : t1Short);
-        dto.setBowlingTeamShort(t2Short.isEmpty() ? generateAbbreviation(dto.getBowlingTeam()) : t2Short);
+        dto.setBattingTeamShort(sanitizeAbbreviation(t1Short, dto.getBattingTeam()));
+        dto.setBowlingTeamShort(sanitizeAbbreviation(t2Short, dto.getBowlingTeam()));
         
         dto.setStatus(status);
         dto.setMatchStarted(matchNode.path("matchStarted").asBoolean());
@@ -423,50 +423,67 @@ public class LiveCricketDataProvider implements CricketDataProvider {
         dto.setScores(scores);
         return dto;
     }
-    private String generateAbbreviation(String teamName) {
-        if (teamName == null || teamName.isEmpty()) return "UNK";
-        String name = teamName.trim();
-        boolean isWomen = name.toLowerCase().endsWith("women") || name.toLowerCase().endsWith("w");
+
+    private String sanitizeAbbreviation(String providedShortName, String fullTeamName) {
+        if (fullTeamName == null) fullTeamName = "";
+        String nameLower = fullTeamName.trim().toLowerCase();
+        boolean isWomen = nameLower.matches(".*\\bwomen\\b.*") || nameLower.endsWith(" w");
         
-        // Strip "Women" or " W" for matching
-        String baseName = name.replaceAll("(?i)\\b(Women|W)\\b", "").trim();
+        String abbr = getIccAbbreviation(fullTeamName);
         
-        String abbr = "";
-        switch (baseName.toLowerCase()) {
-            case "india": abbr = "IND"; break;
-            case "australia": abbr = "AUS"; break;
-            case "england": abbr = "ENG"; break;
-            case "new zealand": abbr = "NZ"; break;
-            case "south africa": abbr = "SA"; break;
-            case "pakistan": abbr = "PAK"; break;
-            case "bangladesh": abbr = "BAN"; break;
-            case "sri lanka": abbr = "SL"; break;
-            case "west indies": abbr = "WI"; break;
-            case "afghanistan": abbr = "AFG"; break;
-            case "ireland": abbr = "IRE"; break;
-            case "zimbabwe": abbr = "ZIM"; break;
-            case "scotland": abbr = "SCO"; break;
-            case "netherlands": abbr = "NED"; break;
-            case "united arab emirates": abbr = "UAE"; break;
-            case "namibia": abbr = "NAM"; break;
-            case "nepal": abbr = "NEP"; break;
-            case "oman": abbr = "OMA"; break;
-            case "papua new guinea": abbr = "PNG"; break;
-            case "united states": case "usa": case "united states of america": abbr = "USA"; break;
-            default: 
-                // Default fallback for domestic
+        if (abbr == null) {
+            if (providedShortName != null && !providedShortName.trim().isEmpty()) {
+                abbr = providedShortName.trim().toUpperCase();
+            } else {
+                String baseName = fullTeamName.replaceAll("(?i)\\b(Women|W)\\b", "").trim();
                 String[] parts = baseName.split(" ");
                 if (parts.length > 1) {
                     abbr = (parts[0].substring(0, 1) + parts[1].substring(0, 1)).toUpperCase();
                 } else {
                     abbr = baseName.length() >= 3 ? baseName.substring(0, 3).toUpperCase() : baseName.toUpperCase();
                 }
-                break;
+            }
         }
         
-        if (isWomen && !abbr.endsWith("-W")) {
-            abbr += "-W";
+        if (isWomen) {
+            abbr = abbr.replaceAll("(?i)\\s*-\\s*W$", "").replaceAll("(?i)\\s+W$", "");
+            if (abbr.length() == 4 && abbr.toUpperCase().endsWith("W")) {
+                abbr = abbr.substring(0, 3);
+            }
+            if (!abbr.endsWith("-W")) {
+                abbr += "-W";
+            }
         }
+        
         return abbr;
+    }
+
+    private String getIccAbbreviation(String teamName) {
+        if (teamName == null || teamName.isEmpty()) return null;
+        String baseName = teamName.replaceAll("(?i)\\b(Women|W)\\b", "").trim().toLowerCase();
+        
+        switch (baseName) {
+            case "india": return "IND";
+            case "australia": return "AUS";
+            case "england": return "ENG";
+            case "new zealand": return "NZ";
+            case "south africa": return "SA";
+            case "pakistan": return "PAK";
+            case "bangladesh": return "BAN";
+            case "sri lanka": return "SL";
+            case "west indies": return "WI";
+            case "afghanistan": return "AFG";
+            case "ireland": return "IRE";
+            case "zimbabwe": return "ZIM";
+            case "scotland": return "SCO";
+            case "netherlands": return "NED";
+            case "united arab emirates": case "uae": return "UAE";
+            case "namibia": return "NAM";
+            case "nepal": return "NEP";
+            case "oman": return "OMA";
+            case "papua new guinea": case "png": return "PNG";
+            case "united states": case "usa": case "united states of america": return "USA";
+            default: return null;
+        }
     }
 }
