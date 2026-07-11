@@ -383,33 +383,43 @@ public class LiveCricketDataProvider implements CricketDataProvider {
         }
         dto.setStatus(status);
         
-        String venue = "";
+        String rawVenue = matchNode.path("venue").asText("").trim();
         JsonNode venueInfo = matchNode.path("venueInfo");
         
         // Debug raw payload
-        dto.setRawVenueJson("venue: " + matchNode.path("venue").asText("") + ", venueInfo: " + venueInfo.toString());
-
-        if (!venueInfo.isMissingNode() && !venueInfo.isNull()) {
-            String ground = venueInfo.path("ground").asText("").trim();
-            String city = venueInfo.path("city").asText("").trim();
-            String country = venueInfo.path("country").asText("").trim();
-            
-            StringBuilder vBuilder = new StringBuilder();
-            if (!ground.isEmpty()) vBuilder.append(ground);
-            if (!city.isEmpty()) {
-                if (vBuilder.length() > 0) vBuilder.append(", ");
-                vBuilder.append(city);
-            }
-            if (!country.isEmpty()) {
-                if (vBuilder.length() > 0) vBuilder.append(", ");
-                vBuilder.append(country);
-            }
-            venue = vBuilder.toString();
+        dto.setRawVenueJson("venue: " + rawVenue + ", venueInfo: " + venueInfo.toString());
+        
+        List<String> venueParts = new ArrayList<>();
+        
+        // 1. Add stadium/ground if available
+        String ground = !venueInfo.isMissingNode() ? venueInfo.path("ground").asText("").trim() : "";
+        if (!ground.isEmpty()) {
+            venueParts.add(ground);
+        } else if (!rawVenue.isEmpty()) {
+            // If raw venue exists but ground doesn't, split rawVenue by comma and take the first part as ground
+            String[] parts = rawVenue.split(",");
+            venueParts.add(parts[0].trim());
         }
         
-        if (venue.isEmpty()) {
-            venue = matchNode.path("venue").asText("").trim();
+        // 2. Add city if available
+        String city = !venueInfo.isMissingNode() ? venueInfo.path("city").asText("").trim() : "";
+        if (!city.isEmpty() && venueParts.stream().noneMatch(p -> p.equalsIgnoreCase(city))) {
+            venueParts.add(city);
+        } else if (!rawVenue.isEmpty()) {
+            // Fallback: check if city is in rawVenue
+            String[] parts = rawVenue.split(",");
+            if (parts.length > 1 && venueParts.stream().noneMatch(p -> p.equalsIgnoreCase(parts[1].trim()))) {
+                venueParts.add(parts[1].trim());
+            }
         }
+        
+        // 3. Add country if available
+        String country = !venueInfo.isMissingNode() ? venueInfo.path("country").asText("").trim() : "";
+        if (!country.isEmpty() && venueParts.stream().noneMatch(p -> p.equalsIgnoreCase(country))) {
+            venueParts.add(country);
+        }
+
+        String venue = String.join(", ", venueParts);
         
         if (venue.isEmpty() || venue.equalsIgnoreCase("TBC, TBC") || venue.equalsIgnoreCase("TBC") || venue.equalsIgnoreCase("TBA")) {
             venue = "Venue unavailable";
