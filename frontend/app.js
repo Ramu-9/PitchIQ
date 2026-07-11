@@ -28,6 +28,7 @@ logEvent(analytics, 'app_open');
 // --- Authentication UI Logic ---
 let currentUser = null;
 let pendingAuthAction = null;
+let guestUsage = parseInt(localStorage.getItem('pitchiq_guest_usage') || '0');
 
 const authModal = document.getElementById('authModal');
 const googleSignInBtn = document.getElementById('googleSignInBtn');
@@ -49,6 +50,10 @@ const signOutBtn = document.getElementById('signOutBtn');
 onAuthStateChanged(auth, (user) => {
     currentUser = user;
     if (user) {
+        // Reset guest limits on successful login
+        guestUsage = 0;
+        localStorage.setItem('pitchiq_guest_usage', '0');
+        
         // User is signed in
         const firstName = user.displayName ? user.displayName.split(' ')[0] : 'User';
         
@@ -122,19 +127,62 @@ function authGuard(actionCallback) {
         actionCallback();
     } else {
         pendingAuthAction = actionCallback;
-        logEvent(analytics, 'auth_modal_opened');
-        document.getElementById('authErrorMsg').style.display = 'none';
-        authModal.style.display = 'flex';
-        setTimeout(() => { authModal.classList.add('visible'); }, 10);
+        if (guestUsage === 0) {
+            showAuthModal(false);
+        } else if (guestUsage === 1) {
+            // Second premium action: execute immediately without modal
+            guestUsage = 2;
+            localStorage.setItem('pitchiq_guest_usage', '2');
+            pendingAuthAction = null;
+            actionCallback();
+        } else {
+            // Third premium action and beyond: force login
+            showAuthModal(true);
+        }
     }
+}
+
+function showAuthModal(isForced) {
+    logEvent(analytics, 'auth_modal_opened');
+    document.getElementById('authErrorMsg').style.display = 'none';
+    
+    const helperMsg = document.getElementById('authHelperMsg');
+    if (helperMsg) helperMsg.style.display = 'none';
+    
+    const subtitle = document.querySelector('.auth-subtitle');
+    if (isForced) {
+        subtitle.textContent = "You've explored PitchIQ as a guest. Sign in for the best experience and unlimited AI-powered cricket analytics.";
+    } else {
+        subtitle.textContent = "Sign in to unlock AI-powered cricket analytics.";
+    }
+
+    authModal.dataset.isForced = isForced ? 'true' : 'false';
+    authModal.style.display = 'flex';
+    setTimeout(() => { authModal.classList.add('visible'); }, 10);
 }
 
 // Modal Actions
 maybeLaterBtn.addEventListener('click', () => {
-    pendingAuthAction = null;
-    logEvent(analytics, 'auth_modal_dismissed');
-    authModal.classList.remove('visible');
-    setTimeout(() => { authModal.style.display = 'none'; }, 400);
+    const isForced = authModal.dataset.isForced === 'true';
+    if (isForced) {
+        // Block action, keep modal open
+        const helperMsg = document.getElementById('authHelperMsg');
+        if (helperMsg) helperMsg.style.display = 'block';
+    } else {
+        logEvent(analytics, 'auth_modal_dismissed');
+        authModal.classList.remove('visible');
+        setTimeout(() => { authModal.style.display = 'none'; }, 400);
+        
+        // Mark first usage complete
+        guestUsage = 1;
+        localStorage.setItem('pitchiq_guest_usage', '1');
+        
+        if (pendingAuthAction) {
+            const actionToRun = pendingAuthAction;
+            pendingAuthAction = null;
+            actionToRun();
+        }
+    }
 });
 
 const originalGoogleBtnHtml = googleSignInBtn.innerHTML;
