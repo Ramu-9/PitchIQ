@@ -769,19 +769,44 @@ async function fetchLiveMatches() {
             if (section === 'skip') return;
 
             let displayStatus = match.status;
-            if (displayStatus.includes(" GMT")) {
+            
+            // Format any scheduled match to local timezone correctly using dateTimeGMT
+            if (displayStatus.startsWith('Match starts at ') && match.dateTimeGMT) {
+                try {
+                    let gmtStr = match.dateTimeGMT.endsWith('Z') ? match.dateTimeGMT : match.dateTimeGMT + 'Z';
+                    const dt = new Date(gmtStr);
+                    const now = new Date();
+                    
+                    const options = { hour: 'numeric', minute: '2-digit', hour12: true };
+                    const timeStr = dt.toLocaleTimeString(undefined, options);
+                    
+                    // Format date (Today, Tomorrow, or Month Day)
+                    let dateStr = "";
+                    if (dt.toDateString() === now.toDateString()) {
+                        dateStr = "Today";
+                    } else {
+                        const tomorrow = new Date(now);
+                        tomorrow.setDate(now.getDate() + 1);
+                        if (dt.toDateString() === tomorrow.toDateString()) {
+                            dateStr = "Tomorrow";
+                        } else {
+                            dateStr = dt.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+                        }
+                    }
+                    
+                    displayStatus = `Starts ${dateStr}, ${timeStr}`;
+                } catch (e) {
+                    console.error("Date format error", e);
+                }
+            } else if (displayStatus.includes(" GMT")) {
+                // Fallback for live/recent matches that might have GMT in their status
                 const timeMatch = displayStatus.match(/(\d{1,2}):(\d{2}) GMT/);
                 if (timeMatch) {
                     let h = parseInt(timeMatch[1]);
                     let m = parseInt(timeMatch[2]);
-                    m += 30;
-                    if (m >= 60) { h += 1; m -= 60; }
-                    h += 5;
-                    let nextDay = "";
-                    if (h >= 24) { h -= 24; nextDay = " (Next Day)"; }
-                    let hStr = h.toString().padStart(2, '0');
-                    let mStr = m.toString().padStart(2, '0');
-                    displayStatus = displayStatus.replace(timeMatch[0], `${hStr}:${mStr} IST${nextDay}`);
+                    const dt = new Date();
+                    dt.setUTCHours(h, m, 0, 0);
+                    displayStatus = displayStatus.replace(timeMatch[0], dt.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit', hour12: true }));
                 }
             }
 
