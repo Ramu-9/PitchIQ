@@ -770,27 +770,39 @@ async function fetchLiveMatches() {
 
             let displayStatus = match.status;
             
-            // Format any scheduled match to local timezone correctly using dateTimeGMT
             if (displayStatus.startsWith('Match starts at ') && match.dateTimeGMT) {
                 try {
                     let gmtStr = match.dateTimeGMT.endsWith('Z') ? match.dateTimeGMT : match.dateTimeGMT + 'Z';
                     const dt = new Date(gmtStr);
                     const now = new Date();
                     
-                    const options = { hour: 'numeric', minute: '2-digit', hour12: true };
-                    const timeStr = dt.toLocaleTimeString(undefined, options);
+                    // Force IST (Asia/Kolkata) to ensure uniform time display for users globally
+                    const options = { 
+                        timeZone: 'Asia/Kolkata', 
+                        hour: 'numeric', 
+                        minute: '2-digit', 
+                        hour12: true, 
+                        timeZoneName: 'short' 
+                    };
+                    // 'en-IN' ensures correct AM/PM and formatting conventions
+                    const timeStr = dt.toLocaleTimeString('en-IN', options).toUpperCase();
                     
-                    // Format date (Today, Tomorrow, or Month Day)
+                    // Format date (Today, Tomorrow, or Month Day) based on IST date
+                    // We need to compare dates in IST to avoid edge cases near midnight
+                    const istOptionsDate = { timeZone: 'Asia/Kolkata', year: 'numeric', month: 'numeric', day: 'numeric' };
+                    const dtIstStr = dt.toLocaleDateString('en-IN', istOptionsDate);
+                    const nowIstStr = now.toLocaleDateString('en-IN', istOptionsDate);
+                    
                     let dateStr = "";
-                    if (dt.toDateString() === now.toDateString()) {
+                    if (dtIstStr === nowIstStr) {
                         dateStr = "Today";
                     } else {
                         const tomorrow = new Date(now);
                         tomorrow.setDate(now.getDate() + 1);
-                        if (dt.toDateString() === tomorrow.toDateString()) {
+                        if (dtIstStr === tomorrow.toLocaleDateString('en-IN', istOptionsDate)) {
                             dateStr = "Tomorrow";
                         } else {
-                            dateStr = dt.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+                            dateStr = dt.toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata', month: 'short', day: 'numeric' });
                         }
                     }
                     
