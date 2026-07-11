@@ -16,6 +16,16 @@ public class MatchDto {
     private String dateTimeGMT;
     private String battingTeamShort;
     private String bowlingTeamShort;
+    
+    private String rawVenueJson;
+
+    public String getRawVenueJson() {
+        return rawVenueJson;
+    }
+
+    public void setRawVenueJson(String rawVenueJson) {
+        this.rawVenueJson = rawVenueJson;
+    }
 
     // Getters and Setters
     public String getDateTimeGMT() { return dateTimeGMT; }

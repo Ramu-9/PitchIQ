@@ -385,6 +385,10 @@ public class LiveCricketDataProvider implements CricketDataProvider {
         
         String venue = "";
         JsonNode venueInfo = matchNode.path("venueInfo");
+        
+        // Debug raw payload
+        dto.setRawVenueJson("venue: " + matchNode.path("venue").asText("") + ", venueInfo: " + venueInfo.toString());
+
         if (!venueInfo.isMissingNode() && !venueInfo.isNull()) {
             String ground = venueInfo.path("ground").asText("").trim();
             String city = venueInfo.path("city").asText("").trim();
