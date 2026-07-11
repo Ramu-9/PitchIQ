@@ -231,7 +231,21 @@ public class LiveCricketDataProvider implements CricketDataProvider {
 
     private List<MatchDto> fetchAndParseList(String endpoint, int offset) throws Exception {
         String url = baseUrl + (baseUrl.endsWith("/") ? "" : "/") + endpoint + "?apikey=" + apiKey + "&offset=" + offset;
-        ResponseEntity<String> response = restTemplate.exchange(url, HttpMethod.GET, null, String.class);
+        
+        String maskedUrl = url.replace(apiKey != null && !apiKey.isEmpty() ? apiKey : "empty", "***");
+        log.info("[PitchIQ-Trace] Executing CricAPI Request to: {}", maskedUrl);
+        
+        ResponseEntity<String> response;
+        try {
+            response = restTemplate.exchange(url, HttpMethod.GET, null, String.class);
+            log.info("[PitchIQ-Trace] Response Code: {}", response.getStatusCode());
+        } catch (org.springframework.web.client.RestClientResponseException e) {
+            log.error("[PitchIQ-Trace] HTTP Error from CricAPI: {} - {}", e.getStatusCode(), e.getResponseBodyAsString());
+            throw e;
+        } catch (Exception e) {
+            log.error("[PitchIQ-Trace] Exception before/during request: {}", e.getMessage(), e);
+            throw e;
+        }
         
         List<MatchDto> matchList = new ArrayList<>();
         JsonNode root = objectMapper.readTree(response.getBody());
@@ -255,7 +269,21 @@ public class LiveCricketDataProvider implements CricketDataProvider {
 
     private List<MatchDto> fetchAndParseCricScoreList() throws Exception {
         String url = baseUrl + (baseUrl.endsWith("/") ? "" : "/") + "v1/cricScore?apikey=" + apiKey;
-        ResponseEntity<String> response = restTemplate.exchange(url, HttpMethod.GET, null, String.class);
+        
+        String maskedUrl = url.replace(apiKey != null && !apiKey.isEmpty() ? apiKey : "empty", "***");
+        log.info("[PitchIQ-Trace] Executing CricAPI CricScore Request to: {}", maskedUrl);
+        
+        ResponseEntity<String> response;
+        try {
+            response = restTemplate.exchange(url, HttpMethod.GET, null, String.class);
+            log.info("[PitchIQ-Trace] CricScore Response Code: {}", response.getStatusCode());
+        } catch (org.springframework.web.client.RestClientResponseException e) {
+            log.error("[PitchIQ-Trace] HTTP Error from CricScore: {} - {}", e.getStatusCode(), e.getResponseBodyAsString());
+            throw e;
+        } catch (Exception e) {
+            log.error("[PitchIQ-Trace] Exception before/during CricScore request: {}", e.getMessage(), e);
+            throw e;
+        }
         
         List<MatchDto> matchList = new ArrayList<>();
         JsonNode root = objectMapper.readTree(response.getBody());
