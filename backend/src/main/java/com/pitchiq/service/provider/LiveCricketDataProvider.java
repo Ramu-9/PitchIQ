@@ -421,7 +421,7 @@ public class LiveCricketDataProvider implements CricketDataProvider {
 
         String venue = String.join(", ", venueParts);
         
-        if (venue.isEmpty() || venue.equalsIgnoreCase("TBC, TBC") || venue.equalsIgnoreCase("TBC") || venue.equalsIgnoreCase("TBA")) {
+        if (venue.isEmpty() || venue.equalsIgnoreCase("TBC, TBC") || venue.equalsIgnoreCase("TBC") || venue.equalsIgnoreCase("TBA") || venue.equalsIgnoreCase("Unknown") || venue.equalsIgnoreCase("null") || venue.equalsIgnoreCase("null, null")) {
             venue = "Venue unavailable";
         }
         
