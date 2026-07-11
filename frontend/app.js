@@ -474,7 +474,7 @@ document.getElementById('analyzeBtn').addEventListener('click', () => {
         const abortController = new AbortController();
         const timeoutId = setTimeout(() => abortController.abort(), 18000); // 18s timeout
 
-        const fetchPromise = fetch('${API_BASE_URL}/analyze', {
+        const fetchPromise = fetch(`${API_BASE_URL}/analyze`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload),
@@ -684,7 +684,7 @@ document.getElementById('analyzeBtn').addEventListener('click', () => {
 // Fetch Live Matches on Load and every 60 seconds
 async function fetchLiveMatches() {
     try {
-        const response = await fetch('${API_BASE_URL}/matches/live');
+        const response = await fetch(`${API_BASE_URL}/matches/live`);
         if (!response.ok) throw new Error('Live matches unavailable');
         const matches = await response.json();
         
@@ -999,7 +999,7 @@ async function sendAskPiMessage() {
             history: askPiHistory
         };
 
-        const response = await fetch('${API_BASE_URL}/ask', {
+        const response = await fetch(`${API_BASE_URL}/ask`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload)
