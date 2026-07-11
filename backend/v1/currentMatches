@@ -1,0 +1,68 @@
+{
+  "data": [
+    {
+      "id": "match-live-1",
+      "name": "England Women vs Australia Women, 1st Test",
+      "matchType": "Test",
+      "status": "Day 2: 1st Session",
+      "venue": "TBC, TBC",
+      "venueInfo": {
+        "ground": "Lord's",
+        "city": "London",
+        "country": "UK"
+      },
+      "dateTimeGMT": "2026-07-10T10:00:00",
+      "matchStarted": true,
+      "matchEnded": false,
+      "teams": ["England Women", "Australia Women"]
+    },
+    {
+      "id": "match-tbc-1",
+      "name": "Derbyshire vs Lancashire",
+      "matchType": "T20",
+      "status": "Match starts at Jul 12",
+      "venue": "TBC, TBC",
+      "dateTimeGMT": "2026-07-12T10:00:00",
+      "matchStarted": false,
+      "matchEnded": false,
+      "teams": ["Derbyshire", "Lancashire"]
+    },
+    {
+      "id": "match-stale-1",
+      "name": "Kent vs Worcestershire",
+      "matchType": "T20",
+      "status": "Match starts at Jul 3",
+      "venue": "TBC, TBC",
+      "dateTimeGMT": "2026-07-03T10:00:00",
+      "matchStarted": false,
+      "matchEnded": false,
+      "teams": ["Kent", "Worcestershire"]
+    },
+    {
+      "id": "match-recent-1",
+      "name": "India vs Pakistan, T20 World Cup Final",
+      "matchType": "T20I",
+      "status": "India won by 5 runs",
+      "venue": "MCG",
+      "dateTimeGMT": "2026-07-09T14:00:00",
+      "matchStarted": true,
+      "matchEnded": true,
+      "teams": ["India", "Pakistan"],
+      "teamInfo": [
+        {"name": "India", "shortname": "IND"},
+        {"name": "Pakistan", "shortname": "PAK"}
+      ]
+    },
+    {
+      "id": "match-recent-domestic-1",
+      "name": "Shivamogga Yodhas vs Mysore Warriors",
+      "matchType": "T20",
+      "status": "Mysore Warriors won by 10 runs",
+      "venue": "M.Chinnaswamy Stadium",
+      "dateTimeGMT": "2026-07-09T16:00:00",
+      "matchStarted": true,
+      "matchEnded": true,
+      "teams": ["Shivamogga Yodhas", "Mysore Warriors"]
+    }
+  ]
+}

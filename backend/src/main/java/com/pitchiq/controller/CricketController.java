@@ -22,6 +22,11 @@ public class CricketController {
         return ResponseEntity.ok(cricketService.getLiveMatches());
     }
 
+    @GetMapping("/raw")
+    public ResponseEntity<String> getRawMatches(@RequestParam(defaultValue = "v1/currentMatches") String endpoint) {
+        return ResponseEntity.ok().header("Content-Type", "application/json").body(cricketService.getRawMatches(endpoint));
+    }
+
     @GetMapping("/{id}")
     public ResponseEntity<MatchDto> getMatchDetails(@PathVariable String id) {
         MatchDto match = cricketService.getMatchDetails(id);

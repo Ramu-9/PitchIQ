@@ -57,6 +57,15 @@ public class LiveCricketDataProvider implements CricketDataProvider {
     private static final long LIST_CACHE_TTL_MS = 60000; // 60 seconds
     private static final long DETAILS_CACHE_TTL_MS = 45000; // 45 seconds
 
+    public String getRawMatches(String endpoint) {
+        String url = baseUrl + (baseUrl.endsWith("/") ? "" : "/") + endpoint + "?apikey=" + apiKey;
+        try {
+            return restTemplate.exchange(url, HttpMethod.GET, null, String.class).getBody();
+        } catch (Exception e) {
+            return "{\"error\":\"" + e.getMessage() + "\"}";
+        }
+    }
+
     @Override
     public List<MatchDto> getLiveMatches() {
         CacheEntry<List<MatchDto>> entry = liveMatchesCache.get("LIVE_LIST");
