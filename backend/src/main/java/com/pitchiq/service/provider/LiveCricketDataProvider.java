@@ -170,7 +170,8 @@ public class LiveCricketDataProvider implements CricketDataProvider {
         String t1Short = match.getBattingTeamShort() != null ? match.getBattingTeamShort().toUpperCase() : "";
         String t2Short = match.getBowlingTeamShort() != null ? match.getBowlingTeamShort().toUpperCase() : "";
         
-        java.util.Set<String> bigTeams = java.util.Set.of("IND", "AUS", "ENG", "NZ", "SA", "PAK", "IND-W", "AUS-W", "ENG-W", "NZ-W", "SA-W", "PAK-W");
+        java.util.Set<String> bigTeams = java.util.Set.of("IND", "AUS", "ENG", "NZ", "SA", "PAK", "SL", "BAN", "WI", "AFG", "IRE", "ZIM", 
+                                                          "IND-W", "AUS-W", "ENG-W", "NZ-W", "SA-W", "PAK-W", "SL-W", "BAN-W", "WI-W", "AFG-W", "IRE-W", "ZIM-W");
         
         if (bigTeams.contains(t1Short) || bigTeams.contains(t2Short)) {
             return 4; // Major International Teams
@@ -304,6 +305,11 @@ public class LiveCricketDataProvider implements CricketDataProvider {
                 dto.setBattingTeam(t1);
                 dto.setBowlingTeam(t2);
                 dto.setName(t1 + " vs " + t2);
+                
+                String t1s = matchNode.path("t1s").asText("").trim();
+                String t2s = matchNode.path("t2s").asText("").trim();
+                dto.setBattingTeamShort(sanitizeAbbreviation(t1s, t1));
+                dto.setBowlingTeamShort(sanitizeAbbreviation(t2s, t2));
                 
                 String dateGMT = matchNode.path("dateTimeGMT").asText("");
                 dto.setDateTimeGMT(dateGMT);
