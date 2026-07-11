@@ -756,17 +756,6 @@ async function fetchLiveMatches() {
         let liveCount = 0, recentCount = 0, upcomingCount = 0;
 
         const now = new Date();
-        const todayStr = now.toLocaleDateString();
-        const yesterday = new Date(now);
-        yesterday.setDate(now.getDate() - 1);
-        const yesterdayStr = yesterday.toLocaleDateString();
-
-        const hasCompletedToday = matches.some(m => {
-            if (!m.matchEnded || !m.dateTimeGMT) return false;
-            let gmtStr = m.dateTimeGMT.endsWith('Z') ? m.dateTimeGMT : m.dateTimeGMT + 'Z';
-            return new Date(gmtStr).toLocaleDateString() === todayStr;
-        });
-        const targetDateStr = hasCompletedToday ? todayStr : yesterdayStr;
 
         matches.forEach(match => {
             const card = document.createElement('div');
