@@ -361,9 +361,15 @@ const lockIcons = document.querySelectorAll('.lock-icon');
 manualModeToggle.addEventListener('change', (e) => {
     const isManual = e.target.checked;
     
-    // Default to T20 if manual mode is enabled without a live match active
-    if (isManual && !document.querySelector('.match-card.active')) {
+    // Always clear active match and default to T20 when entering manual mode 
+    // to prevent format confusion from a previously clicked live match
+    if (isManual) {
+        document.querySelectorAll('.match-card.active').forEach(c => c.classList.remove('active'));
         document.getElementById('matchFormat').value = 't20';
+        window.currentMatchVenue = '';
+        window.currentBattingTeam = '';
+        window.currentBowlingTeam = '';
+        window.currentMatchStatus = 'live';
     }
 
     inputFields.forEach(input => {
@@ -950,7 +956,9 @@ async function fetchLiveMatches() {
                 liveContainer.appendChild(card);
                 liveCount++;
             } else if (section === 'recent') {
-                recentContainer.appendChild(card);
+                if (recentCount < 12) {
+                    recentContainer.appendChild(card);
+                }
                 recentCount++;
             } else if (section === 'upcoming') {
                 upcomingContainer.appendChild(card);
