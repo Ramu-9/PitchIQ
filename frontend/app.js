@@ -777,6 +777,9 @@ async function fetchLiveMatches() {
                 }
             } else if (match.matchEnded) {
                 latestScore = match.status || "Match Ended";
+            } else if (match.matchStarted) {
+                // Live match with no score data — show status context, not "starting soon"
+                latestScore = match.status || "Live";
             } else {
                 latestScore = "Match starting soon";
             }
@@ -859,6 +862,9 @@ async function fetchLiveMatches() {
                 }
             }
 
+            // Hide bottom status line if it's identical to the score line (avoids duplicate text)
+            const showStatus = latestScore !== displayStatus;
+
             card.innerHTML = `
                 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
                     <span class="match-status">${statusBadge}</span>
@@ -867,7 +873,7 @@ async function fetchLiveMatches() {
                 <div class="match-title">${t1} vs ${t2}</div>
                 <div class="match-score" style="color:var(--text-primary);font-weight:600;font-size:14px;margin:6px 0;">${latestScore}</div>
                 <div style="font-size:10px;color:var(--text-tertiary);">${match.venue || 'Unknown Venue'}</div>
-                <div style="font-size:10px;color:var(--accent-warm);margin-top:6px;font-weight:500;">${displayStatus}</div>
+                ${showStatus ? `<div style="font-size:10px;color:var(--accent-warm);margin-top:6px;font-weight:500;">${displayStatus}</div>` : ''}
             `;
             
             card.onclick = async () => {
