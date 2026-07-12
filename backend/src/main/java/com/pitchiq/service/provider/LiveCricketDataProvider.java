@@ -108,6 +108,32 @@ public class LiveCricketDataProvider implements CricketDataProvider {
                 return false;
             });
             
+            // Deduplicate matches (CricAPI sometimes returns multiple entries for the same match with different statuses)
+            Map<String, MatchDto> uniqueMatches = new HashMap<>();
+            for (MatchDto m : allMatches) {
+                if (m.getName() == null) continue;
+                String datePart = m.getDateTimeGMT() != null && m.getDateTimeGMT().contains("T") 
+                                  ? m.getDateTimeGMT().substring(0, m.getDateTimeGMT().indexOf('T')) 
+                                  : "";
+                String dedupeKey = m.getName().trim() + "_" + datePart;
+                
+                // If a duplicate exists, keep the one that has scores or is already marked as started
+                if (uniqueMatches.containsKey(dedupeKey)) {
+                    MatchDto existing = uniqueMatches.get(dedupeKey);
+                    boolean currentHasScores = m.getScores() != null && !m.getScores().isEmpty();
+                    boolean existingHasScores = existing.getScores() != null && !existing.getScores().isEmpty();
+                    
+                    if (currentHasScores && !existingHasScores) {
+                        uniqueMatches.put(dedupeKey, m);
+                    } else if (m.isMatchStarted() && !existing.isMatchStarted()) {
+                        uniqueMatches.put(dedupeKey, m);
+                    }
+                } else {
+                    uniqueMatches.put(dedupeKey, m);
+                }
+            }
+            allMatches = new ArrayList<>(uniqueMatches.values());
+            
             // Deterministic Sorting:
             // 1. State Priority: Live > Recent (Completed) > Upcoming
             // 2. Quality Priority: International > Major Franchise > Domestic
