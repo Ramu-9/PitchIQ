@@ -5,7 +5,7 @@ import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signO
 
 const API_BASE_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
     ? 'http://localhost:8080/api/v1' 
-    : 'https://pitchiq-production-7a44.up.railway.app/api/v1';
+    : 'https://pitchiq-backend-402093814656.asia-south1.run.app/api/v1';
 
 const firebaseConfig = {
     apiKey: "AIzaSyCRCMXsIdBYMUsa8Ec17kjtV-80YFvXVNI",
