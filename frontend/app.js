@@ -883,10 +883,23 @@ async function fetchLiveMatches() {
             `;
             
             card.onclick = async () => {
-                // Remove active class from all match cards
-                document.querySelectorAll('.match-card').forEach(c => c.classList.remove('active'));
-                // Add active class to clicked card
+                // Clear any existing error toasts
+                document.querySelectorAll('.match-error-toast').forEach(e => e.remove());
+
+                // Remove active and loading classes from all match cards
+                document.querySelectorAll('.match-card').forEach(c => {
+                    c.classList.remove('active');
+                    c.classList.remove('loading');
+                });
+                
+                // Add active and loading class to clicked card
                 card.classList.add('active');
+                card.classList.add('loading');
+
+                // Show full screen overlay instantly for immediate feedback
+                showLoadingSequence();
+                const text = document.getElementById('simStageText');
+                if (text) text.textContent = "LOADING MATCH DATA...";
 
                 // Ensure manual mode is off when a live match is clicked
                 if (manualModeToggle.checked) {
@@ -895,18 +908,38 @@ async function fetchLiveMatches() {
                 
                 try {
                     const detailResponse = await fetch(`${API_BASE_URL}/matches/${match.id}`);
-                    if (detailResponse.ok) {
-                        const detailedMatch = await detailResponse.json();
-                        if (detailedMatch.scores && detailedMatch.scores.length > 0) {
-                            const ds = detailedMatch.scores[detailedMatch.scores.length - 1];
-                            runs = ds.runs;
-                            wickets = ds.wickets;
-                            overs = ds.overs;
-                        }
+                    if (!detailResponse.ok) {
+                        throw new Error('Match details not found');
+                    }
+                    
+                    const detailedMatch = await detailResponse.json();
+                    if (detailedMatch.scores && detailedMatch.scores.length > 0) {
+                        const ds = detailedMatch.scores[detailedMatch.scores.length - 1];
+                        runs = ds.runs;
+                        wickets = ds.wickets;
+                        overs = ds.overs;
                     }
                 } catch(e) {
-                    console.warn('[PitchIQ] Could not fetch match details, using summary data.', e);
+                    console.warn('[PitchIQ] Could not fetch match details.', e);
+                    card.classList.remove('loading');
+                    hideLoadingSequence();
+                    
+                    // Show clear error state to user instead of silently failing
+                    const errorToast = document.createElement('div');
+                    errorToast.className = 'match-error-toast';
+                    errorToast.textContent = 'Failed to load match details. Please try again.';
+                    card.after(errorToast);
+                    
+                    // Remove toast after a few seconds
+                    setTimeout(() => {
+                        errorToast.style.opacity = '0';
+                        setTimeout(() => errorToast.remove(), 400);
+                    }, 4000);
+                    return; // Stop execution on error
                 }
+                
+                // Remove loading state from card (overlay stays as simulation starts)
+                card.classList.remove('loading');
 
                 // Store venue context for simulations & AI
                 window.currentMatchVenue = match.venue || 'Unknown Venue';
