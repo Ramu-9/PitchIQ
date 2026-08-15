@@ -804,7 +804,7 @@ document.getElementById('analyzeBtn').addEventListener('click', () => {
 function isTerminalStatus(status) {
     if (!status || typeof status !== 'string') return false;
     const s = status.toLowerCase();
-    return s.includes('won by') ||
+    return (s.includes('won by') && !s.includes('toss won by')) ||
            s.includes('lost by') ||
            s.includes('draw') ||
            s.includes('drawn') ||

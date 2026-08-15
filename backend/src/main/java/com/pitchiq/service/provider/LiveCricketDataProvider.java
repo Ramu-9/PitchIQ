@@ -51,7 +51,7 @@ public class LiveCricketDataProvider implements CricketDataProvider {
             return false;
         }
         String s = status.toLowerCase();
-        return s.contains("won by") ||
+        return (s.contains("won by") && !s.contains("toss won by")) ||
                s.contains("lost by") ||
                s.contains("draw") ||
                s.contains("drawn") ||
@@ -158,8 +158,8 @@ public class LiveCricketDataProvider implements CricketDataProvider {
                 if (match.isMatchEnded() || isTerminalStatus(match.getStatus())) {
                     return false;
                 }
-                // If match is not started (upcoming candidate)
-                if (!match.isMatchStarted()) {
+                // If match is not started (upcoming candidate) but has no score data
+                if (!match.isMatchStarted() && (match.getScores() == null || match.getScores().isEmpty())) {
                     LocalDateTime matchTime = parseMatchTime(match.getDateTimeGMT());
                     // Scheduled start time has already passed without match starting
                     if (matchTime != null && matchTime.isBefore(nowUtc)) {

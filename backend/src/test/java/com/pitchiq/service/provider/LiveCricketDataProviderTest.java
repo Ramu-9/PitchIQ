@@ -48,6 +48,8 @@ class LiveCricketDataProviderTest {
         assertFalse(LiveCricketDataProvider.isTerminalStatus("Innings break"));
         assertFalse(LiveCricketDataProvider.isTerminalStatus("Stumps - Day 2"));
         assertFalse(LiveCricketDataProvider.isTerminalStatus("Rain delay - play to resume shortly"));
+        assertFalse(LiveCricketDataProvider.isTerminalStatus("Toss won by Australia and elected to bat"));
+        assertFalse(LiveCricketDataProvider.isTerminalStatus("toss won by india"));
         assertFalse(LiveCricketDataProvider.isTerminalStatus(null));
         assertFalse(LiveCricketDataProvider.isTerminalStatus(""));
     }
