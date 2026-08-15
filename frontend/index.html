@@ -21,21 +21,32 @@
     <div id="loadingOverlay" class="simulation-overlay" style="display: none;">
         <div class="sim-overlay-content">
             <div class="sim-logo-container">
-                <div class="sim-logo-pulse"></div>
+                <div class="sim-ring-outer">
+                    <div class="sim-ring-inner"></div>
+                    <div class="sim-ring-dot"></div>
+                </div>
                 <div class="sim-logo-text">PitchIQ</div>
+                <div class="sim-logo-sub">TELEMETRY ENGINE</div>
             </div>
             
+            <div class="sim-telemetry-feed" id="simTelemetryFeed">
+                <div class="sim-feed-line"><span class="sim-feed-prefix">›</span> <span class="sim-feed-text">Awaiting input…</span></div>
+            </div>
+
             <div class="sim-counter-container">
-                <div id="simCounter" class="sim-counter">0</div>
-                <div id="simCounterSub" class="sim-counter-sub">Monte Carlo Simulations Completed</div>
-                <div id="simCounterDone" class="sim-counter-done" style="display: none;">&#10003; 10,000 Simulations Complete</div>
+                <div class="sim-counter-row">
+                    <div id="simCounter" class="sim-counter">0</div>
+                    <div id="simCounterLabel" class="sim-counter-label">iterations</div>
+                </div>
+                <div id="simCounterDone" class="sim-counter-done" style="display: none;">&#10003; Analysis Complete</div>
             </div>
 
             <div class="sim-progress-container">
                 <div class="sim-progress-bar">
                     <div id="simProgressFill" class="sim-progress-fill"></div>
+                    <div id="simScannerGlow" class="sim-scanner-glow"></div>
                 </div>
-                <div id="simStageText" class="sim-stage-text">Initializing Simulation...</div>
+                <div id="simStageText" class="sim-stage-text">Initializing…</div>
             </div>
         </div>
     </div>

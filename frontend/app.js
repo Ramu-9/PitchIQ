@@ -398,32 +398,124 @@ document.getElementById('matchFormat').addEventListener('change', () => {
 
 let _loadingEllipsisInterval = null;
 let _loadingSafetyTimeout = null;
+let _simTelemetryInterval = null;
+let _simCounterRaf = null;
+let _simFeedStageIdx = 0;
+
+const SIM_TELEMETRY_STAGES = [
+    "Initializing pitch model…",
+    "Loading venue conditions…",
+    "Calibrating scoring engine…",
+    "Running Monte Carlo iterations…",
+    "Sampling ball-by-ball outcomes…",
+    "Computing run distributions…",
+    "Evaluating wicket probabilities…",
+    "Modeling powerplay dynamics…",
+    "Analyzing death-over patterns…",
+    "Estimating chase probability…",
+    "Aggregating win probability…",
+    "Converging simulation results…",
+];
+
+function _simAddFeedLine(text, cssClass) {
+    const feed = document.getElementById('simTelemetryFeed');
+    if (!feed) return;
+    const line = document.createElement('div');
+    line.className = 'sim-feed-line' + (cssClass ? ' ' + cssClass : '');
+    line.innerHTML = `<span class="sim-feed-prefix">›</span> <span class="sim-feed-text">${text}</span>`;
+    feed.appendChild(line);
+    // Keep only last 6 lines visible
+    while (feed.children.length > 6) {
+        feed.removeChild(feed.firstChild);
+    }
+    feed.scrollTop = feed.scrollHeight;
+}
+
+function _simResetFeed() {
+    const feed = document.getElementById('simTelemetryFeed');
+    if (!feed) return;
+    feed.innerHTML = '';
+}
+
+function _simStartTelemetry() {
+    _simFeedStageIdx = 0;
+    _simAddFeedLine(SIM_TELEMETRY_STAGES[0]);
+    _simFeedStageIdx = 1;
+    _simTelemetryInterval = setInterval(() => {
+        if (_simFeedStageIdx < SIM_TELEMETRY_STAGES.length) {
+            _simAddFeedLine(SIM_TELEMETRY_STAGES[_simFeedStageIdx]);
+            _simFeedStageIdx++;
+        } else {
+            // Cycle back seamlessly from the computational middle
+            _simFeedStageIdx = 3;
+            _simAddFeedLine(SIM_TELEMETRY_STAGES[_simFeedStageIdx]);
+            _simFeedStageIdx++;
+        }
+    }, 850);
+}
+
+function _simStopTelemetry() {
+    if (_simTelemetryInterval) { clearInterval(_simTelemetryInterval); _simTelemetryInterval = null; }
+}
+
+function _simStartCounter() {
+    const counter = document.getElementById('simCounter');
+    if (!counter) return;
+    let count = 0;
+    const startTime = performance.now();
+    const step = (timestamp) => {
+        const elapsed = timestamp - startTime;
+        // Asymptotic curve: starts fast, decelerates toward ~10,000
+        // Mimics Monte Carlo convergence — rapid early progress, gradual refinement
+        count = Math.floor(10000 * (1 - Math.exp(-elapsed / 2800)));
+        counter.textContent = count.toLocaleString();
+        _simCounterRaf = window.requestAnimationFrame(step);
+    };
+    _simCounterRaf = window.requestAnimationFrame(step);
+}
+
+function _simStopCounter() {
+    if (_simCounterRaf) { window.cancelAnimationFrame(_simCounterRaf); _simCounterRaf = null; }
+}
+
+function _simCleanup() {
+    _simStopTelemetry();
+    _simStopCounter();
+    if (_loadingEllipsisInterval) { clearInterval(_loadingEllipsisInterval); _loadingEllipsisInterval = null; }
+    if (_loadingSafetyTimeout) { clearTimeout(_loadingSafetyTimeout); _loadingSafetyTimeout = null; }
+}
 
 function showLoadingSequence() {
     // Legacy function used by live match card click
     const overlay = document.getElementById('loadingOverlay');
     const text = document.getElementById('simStageText');
     const fill = document.getElementById('simProgressFill');
-    const counterContainer = document.querySelector('.sim-counter-container');
+    const counterRow = document.querySelector('.sim-counter-row');
+    const scannerGlow = document.getElementById('simScannerGlow');
     
+    _simResetFeed();
     overlay.style.display = 'flex';
     setTimeout(() => { overlay.style.opacity = '1'; }, 10);
     
-    if (counterContainer) counterContainer.style.display = 'none';
-    if (text) text.textContent = "Loading Live Match Data...";
-    if (fill) fill.style.width = "25%";
+    if (counterRow) counterRow.style.display = 'none';
+    if (scannerGlow) scannerGlow.classList.remove('sim-scanner-stopped');
+    if (text) text.textContent = "LOADING MATCH DATA";
+    if (fill) fill.style.width = "0%";
+    _simAddFeedLine("Fetching live match data…");
 }
 
 function hideLoadingSequence() {
-    // Clear any animated ellipsis interval
-    if (_loadingEllipsisInterval) { clearInterval(_loadingEllipsisInterval); _loadingEllipsisInterval = null; }
-    if (_loadingSafetyTimeout) { clearTimeout(_loadingSafetyTimeout); _loadingSafetyTimeout = null; }
+    _simCleanup();
     const overlay = document.getElementById('loadingOverlay');
     overlay.style.opacity = '0';
     setTimeout(() => { 
-        overlay.style.display = 'none'; 
-        const counterContainer = document.querySelector('.sim-counter-container');
-        if (counterContainer) counterContainer.style.display = 'flex';
+        overlay.style.display = 'none';
+        const counterRow = document.querySelector('.sim-counter-row');
+        if (counterRow) counterRow.style.display = 'flex';
+        const counterDone = document.getElementById('simCounterDone');
+        if (counterDone) counterDone.style.display = 'none';
+        const scannerGlow = document.getElementById('simScannerGlow');
+        if (scannerGlow) scannerGlow.classList.remove('sim-scanner-stopped');
     }, 500);
 }
 
@@ -470,41 +562,43 @@ document.getElementById('analyzeBtn').addEventListener('click', () => {
     }
 
     try {
-        // --- Premium Simulation UX Start ---
+        // --- Telemetry Simulation UX Start ---
         const overlay = document.getElementById('loadingOverlay');
         const text = document.getElementById('simStageText');
         const fill = document.getElementById('simProgressFill');
         const counter = document.getElementById('simCounter');
         const counterDone = document.getElementById('simCounterDone');
-        const counterSub = document.getElementById('simCounterSub');
-        const counterContainer = document.querySelector('.sim-counter-container');
+        const counterRow = document.querySelector('.sim-counter-row');
+        const counterLabel = document.getElementById('simCounterLabel');
+        const scannerGlow = document.getElementById('simScannerGlow');
         
         // Reset overlay state
+        _simCleanup();
+        _simResetFeed();
         counter.textContent = "0";
         counterDone.style.display = "none";
-        counter.style.display = "block";
-        counterSub.style.display = "block";
+        if (counterRow) counterRow.style.display = 'flex';
+        if (counterLabel) counterLabel.textContent = 'iterations';
         fill.style.width = "0%";
-        if (counterContainer) counterContainer.style.display = 'flex';
+        if (scannerGlow) scannerGlow.classList.remove('sim-scanner-stopped');
         
         overlay.style.display = 'flex';
-        // Small delay to allow display block to apply before opacity transition
         await new Promise(r => setTimeout(r, 10));
         overlay.style.opacity = '1';
 
-        // Stage 1: Initializing
-        text.textContent = "Preparing Simulation";
-        fill.style.width = "15%";
-        await new Promise(r => setTimeout(r, 200));
+        // Stage 1: Initialize engine
+        text.textContent = "INITIALIZING ENGINE";
+        _simAddFeedLine("Initializing PitchIQ telemetry engine…");
+        await new Promise(r => setTimeout(r, 250));
 
         // Scroll into view so user sees the analytics section
         document.getElementById('hud').scrollIntoView({ behavior: 'smooth', block: 'start' });
 
-        // Stage 2: Running Simulations
-        text.textContent = "Running Monte Carlo...";
-        fill.style.width = "40%";
+        // Stage 2: Start live telemetry feed + counter + backend request concurrently
+        text.textContent = "RUNNING SIMULATION";
+        _simStartTelemetry();
+        _simStartCounter();
         
-        // Start backend request concurrently with counter animation
         let maxOvers = 20;
         if (matchFormat === 'odi') maxOvers = 50;
         if (matchFormat === 'test') maxOvers = 450;
@@ -549,74 +643,45 @@ document.getElementById('analyzeBtn').addEventListener('click', () => {
             };
         });
 
-        // Animate counter
-        const counterDuration = 1200;
-        const counterPromise = new Promise(resolve => {
-            let startTimestamp = null;
-            const step = (timestamp) => {
-                if (!startTimestamp) startTimestamp = timestamp;
-                const progress = Math.min((timestamp - startTimestamp) / counterDuration, 1);
-                // Ease out cubic
-                const easeOut = 1 - Math.pow(1 - progress, 3);
-                counter.textContent = Math.floor(easeOut * 10000).toLocaleString();
-                
-                if (progress < 1) {
-                    window.requestAnimationFrame(step);
-                } else {
-                    resolve();
-                }
-            };
-            window.requestAnimationFrame(step);
-        });
-
-        // Wait for counter to complete first so it doesn't appear stuck
-        await counterPromise;
-
-        // Show 10,000 Complete Mark
-        counter.style.display = "none";
-        counterSub.style.display = "none";
-        counterDone.style.display = "block";
-        await new Promise(r => setTimeout(r, 200));
-
-        // Stage 3: Computing Match Probabilities & Waiting for AI
-        fill.style.width = "70%";
-        // Animate the stage text to show continuous progress while waiting for API
-        let _dots = 0;
-        const _baseText = "Generating AI Intelligence";
-        text.textContent = _baseText + "...";
-        _loadingEllipsisInterval = setInterval(() => {
-            _dots = (_dots + 1) % 4;
-            text.textContent = _baseText + ".".repeat(_dots || 1);
-        }, 400);
-
         // Safety timeout: force-hide overlay after 25s to prevent permanent hang
         _loadingSafetyTimeout = setTimeout(() => {
             console.warn('[PitchIQ] Safety timeout — forcing overlay hide.');
             hideLoadingSequence();
         }, 25000);
 
-        // Now wait for fetch to complete if it hasn't already
+        // Wait for backend response (telemetry + counter run throughout)
         const data = await fetchPromise;
-        // Clear ellipsis once data is received
-        if (_loadingEllipsisInterval) { clearInterval(_loadingEllipsisInterval); _loadingEllipsisInterval = null; }
 
-        // Stage 4: AI Intelligence (Skip if not present)
+        // --- Backend responded — begin completion sequence ---
+        _simStopTelemetry();
+        _simStopCounter();
+        if (_loadingSafetyTimeout) { clearTimeout(_loadingSafetyTimeout); _loadingSafetyTimeout = null; }
+
+        // Show completion feed line
+        _simAddFeedLine("✓ Simulation converged", 'sim-feed-success');
+        text.textContent = "ANALYSIS COMPLETE";
+
+        // Stop scanner, show final counter state
+        if (scannerGlow) scannerGlow.classList.add('sim-scanner-stopped');
+        fill.style.width = "100%";
+
+        // Swap counter for done checkmark
+        if (counterRow) counterRow.style.display = 'none';
+        counterDone.style.display = "block";
+        await new Promise(r => setTimeout(r, 400));
+
+        // Show AI intelligence feed line if present
         if (data.aiCommentary && data.aiCommentary.length > 0) {
-            text.textContent = "Formatting Match Insights...";
-            fill.style.width = "90%";
+            _simAddFeedLine("✓ AI match intelligence received", 'sim-feed-success');
+            text.textContent = "RENDERING DASHBOARD";
             await new Promise(r => setTimeout(r, 300));
         }
 
-        // Stage 5: Rendering Dashboard
-        text.textContent = "Rendering Dashboard";
-        fill.style.width = "100%";
-        await new Promise(r => setTimeout(r, 300));
-
-        // Hide Overlay (Handled in finally block, but we fade out here)
+        // Fade out overlay
         overlay.style.opacity = '0';
         await new Promise(r => setTimeout(r, 500));
 
-        // --- End Simulation UX ---
+        // --- End Telemetry Simulation UX ---
 
         // Show HUD
         const hud = document.getElementById('hud');
@@ -672,7 +737,7 @@ document.getElementById('analyzeBtn').addEventListener('click', () => {
         
         let statusText = "🔴 LIVE";
         if (payload.matchStatus === 'upcoming') statusText = "📅 UPCOMING";
-        if (payload.matchStatus === 'completed') statusText = "📝 COMPLETED";
+        if (payload.matchStatus === 'completed' || payload.matchStatus === 'recent') statusText = "📝 COMPLETED";
         document.getElementById('headerMatchStatus').textContent = statusText;
 
         // Trigger Animated Count-ups
@@ -735,6 +800,29 @@ document.getElementById('analyzeBtn').addEventListener('click', () => {
     }); // End authGuard
 });
 
+// Helper to detect terminal match statuses
+function isTerminalStatus(status) {
+    if (!status || typeof status !== 'string') return false;
+    const s = status.toLowerCase();
+    return s.includes('won by') ||
+           s.includes('lost by') ||
+           s.includes('draw') ||
+           s.includes('drawn') ||
+           s.includes('tie') ||
+           s.includes('tied') ||
+           s.includes('no result') ||
+           s.includes('abandoned') ||
+           s.includes('cancelled') ||
+           s.includes('canceled') ||
+           s.includes('awarded') ||
+           s.includes('match ended') ||
+           s.includes('refused to play') ||
+           s.includes('conceded') ||
+           s.includes('walkover') ||
+           s.includes('concluded') ||
+           s.includes('postponed');
+}
+
 // Fetch Live Matches on Load and every 60 seconds
 async function fetchLiveMatches() {
     try {
@@ -767,6 +855,9 @@ async function fetchLiveMatches() {
             const card = document.createElement('div');
             card.className = 'match-card';
             
+            const isTerminal = isTerminalStatus(match.status);
+            const isStumps = match.status && (match.status.toLowerCase().includes('stump') || match.status.toLowerCase().includes('day '));
+
             let latestScore = '';
             let overs = 0;
             let wickets = 0;
@@ -781,7 +872,7 @@ async function fetchLiveMatches() {
                 if (match.scores.length > 1) {
                     targetScore = match.scores[0].runs + 1;
                 }
-            } else if (match.matchEnded) {
+            } else if (match.matchEnded || isTerminal) {
                 latestScore = match.status || "Match Ended";
             } else if (match.matchStarted) {
                 // Live match with no score data — show status context, not "starting soon"
@@ -796,18 +887,26 @@ async function fetchLiveMatches() {
             
             let section = 'live'; // 'live', 'recent', 'upcoming', 'skip'
             let statusBadge = "🔴 LIVE";
-            
-            let isStumps = match.status && (match.status.toLowerCase().includes('stump') || match.status.toLowerCase().includes('day '));
 
-            if (match.matchEnded) {
-                // Show completed matches as recent. 
-                // We'll limit the total recent matches rendered to a reasonable number below.
+            if (match.matchEnded || isTerminal) {
+                // Terminal / completed results must NEVER be displayed as LIVE
                 section = 'recent';
                 statusBadge = "📝 COMPLETED";
             } else if (match.matchStarted || isStumps) {
                 section = 'live';
                 statusBadge = "🔴 LIVE";
             } else {
+                // Upcoming: Only show if scheduled start time is genuinely in the future
+                if (match.dateTimeGMT) {
+                    try {
+                        let gmtStr = match.dateTimeGMT.endsWith('Z') ? match.dateTimeGMT : match.dateTimeGMT + 'Z';
+                        const dt = new Date(gmtStr);
+                        if (dt <= now) {
+                            // Scheduled start time has passed and match has not started
+                            return;
+                        }
+                    } catch (e) {}
+                }
                 section = 'upcoming';
                 statusBadge = "📅 UPCOMING";
             }
@@ -899,7 +998,7 @@ async function fetchLiveMatches() {
                 // Show full screen overlay instantly for immediate feedback
                 showLoadingSequence();
                 const text = document.getElementById('simStageText');
-                if (text) text.textContent = "LOADING MATCH DATA...";
+                if (text) text.textContent = "LOADING MATCH DATA";
 
                 // Ensure manual mode is off when a live match is clicked
                 if (manualModeToggle.checked) {
