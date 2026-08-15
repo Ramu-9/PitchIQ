@@ -242,7 +242,7 @@ public class GeminiAiCommentaryProvider implements AiCommentaryProvider {
     }
 
     private String buildMatchContext(MatchStateRequest request, SimulationResponse sim, String status) {
-        if ("upcoming".equals(status)) {
+        if ("upcoming".equals(status) || (request.getOvers() == 0 && request.getCurrentRuns() == 0)) {
             return "Pre-match — no score yet. Generate pre-match predictions and strategy insights.";
         } else if ("completed".equals(status)) {
             return "Final: " + request.getCurrentRuns() + "/" + request.getCurrentWickets()
