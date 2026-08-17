@@ -285,12 +285,27 @@ public class GeminiAiCommentaryProvider implements AiCommentaryProvider {
                     + geminiJsonResponse.substring(0, Math.min(300, geminiJsonResponse.length())));
         }
         String text = candidates.get(0).path("content").path("parts").get(0).path("text").asText();
-        // Strip markdown code fences that Gemini may add despite instructions
-        text = text.trim();
-        if (text.startsWith("```")) {
-            text = text.replaceAll("(?s)^```[a-zA-Z]*\\s*", "").replaceAll("\\s*```$", "").trim();
+        
+        // Robust JSON extraction
+        int firstBrace = text.indexOf('{');
+        int firstBracket = text.indexOf('[');
+        int start = -1;
+        if (firstBrace != -1 && firstBracket != -1) {
+            start = Math.min(firstBrace, firstBracket);
+        } else {
+            start = Math.max(firstBrace, firstBracket);
         }
-        return text;
+        
+        if (start != -1) {
+            int lastBrace = text.lastIndexOf('}');
+            int lastBracket = text.lastIndexOf(']');
+            int end = Math.max(lastBrace, lastBracket);
+            if (end > start) {
+                text = text.substring(start, end + 1);
+            }
+        }
+        
+        return text.trim();
     }
 
     // ─── Response Parsers ───────────────────────────────────────────────────

@@ -100,15 +100,9 @@ public class LiveCricketDataProvider implements CricketDataProvider {
 
         Map<String, MatchDto> matchMap = new java.util.LinkedHashMap<>();
         try {
-            // Step 1: Parallelize the 3 CricAPI requests concurrently via CompletableFuture
-            CompletableFuture<List<MatchDto>> currentFuture = CompletableFuture.supplyAsync(() -> {
-                try {
-                    return fetchAndParseList("v1/currentMatches", 0);
-                } catch (Exception e) {
-                    log.warn("[PitchIQ] Failed to fetch currentMatches: {}", e.getMessage());
-                    return Collections.emptyList();
-                }
-            });
+            // Step 1: Parallelize the CricAPI requests concurrently via CompletableFuture
+            CompletableFuture<List<MatchDto>> currentFuture0 = CompletableFuture.supplyAsync(() -> fetchAndParseListSafely("v1/currentMatches", 0));
+            CompletableFuture<List<MatchDto>> currentFuture1 = CompletableFuture.supplyAsync(() -> fetchAndParseListSafely("v1/currentMatches", 25));
 
             CompletableFuture<List<MatchDto>> upcomingFuture = CompletableFuture.supplyAsync(() -> {
                 try {
@@ -119,20 +113,18 @@ public class LiveCricketDataProvider implements CricketDataProvider {
                 }
             });
 
-            CompletableFuture<List<MatchDto>> historicalFuture = CompletableFuture.supplyAsync(() -> {
-                try {
-                    return fetchAndParseList("v1/matches", 0);
-                } catch (Exception e) {
-                    log.warn("[PitchIQ] Failed to fetch matches: {}", e.getMessage());
-                    return Collections.emptyList();
-                }
-            });
+            CompletableFuture<List<MatchDto>> historicalFuture0 = CompletableFuture.supplyAsync(() -> fetchAndParseListSafely("v1/matches", 0));
+            CompletableFuture<List<MatchDto>> historicalFuture1 = CompletableFuture.supplyAsync(() -> fetchAndParseListSafely("v1/matches", 25));
 
-            CompletableFuture.allOf(currentFuture, upcomingFuture, historicalFuture).join();
+            CompletableFuture.allOf(currentFuture0, currentFuture1, upcomingFuture, historicalFuture0, historicalFuture1).join();
 
-            List<MatchDto> current = currentFuture.join();
+            List<MatchDto> current = new ArrayList<>(currentFuture0.join());
+            current.addAll(currentFuture1.join());
+            
             List<MatchDto> upcoming = upcomingFuture.join();
-            List<MatchDto> historical = historicalFuture.join();
+            
+            List<MatchDto> historical = new ArrayList<>(historicalFuture0.join());
+            historical.addAll(historicalFuture1.join());
 
             // 1. Current matches take priority
             for (MatchDto match : current) {
@@ -260,6 +252,15 @@ public class LiveCricketDataProvider implements CricketDataProvider {
                 return entry.data;
             }
             return new ArrayList<>();
+        }
+    }
+
+    private List<MatchDto> fetchAndParseListSafely(String endpoint, int offset) {
+        try {
+            return fetchAndParseList(endpoint, offset);
+        } catch (Exception e) {
+            log.warn("[PitchIQ] Failed to fetch {} at offset {}: {}", endpoint, offset, e.getMessage());
+            return Collections.emptyList();
         }
     }
 
@@ -562,7 +563,7 @@ public class LiveCricketDataProvider implements CricketDataProvider {
                 if (isTerminalStatus(status)) {
                     dto.setMatchStarted(true);
                     dto.setMatchEnded(true);
-                } else if (status.startsWith("Match starts at ")) {
+                } else if (status.startsWith("Match starts at ") || status.toLowerCase().contains("not started")) {
                     dto.setMatchStarted(false);
                     dto.setMatchEnded(false);
                 } else {
@@ -687,6 +688,9 @@ public class LiveCricketDataProvider implements CricketDataProvider {
         if (isTerminalStatus(status)) {
             started = true;
             ended = true;
+        } else if (status.toLowerCase().contains("not started") || status.startsWith("Match starts at ")) {
+            started = false;
+            ended = false;
         }
 
         dto.setMatchStarted(started);
