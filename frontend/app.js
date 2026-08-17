@@ -620,7 +620,7 @@ document.getElementById('analyzeBtn').addEventListener('click', () => {
         };
 
         const abortController = new AbortController();
-        const timeoutId = setTimeout(() => abortController.abort(), 18000); // 18s timeout
+        const timeoutId = setTimeout(() => abortController.abort(), 50000); // 50s timeout
 
         const fetchPromise = fetch(`${API_BASE_URL}/analyze`, {
             method: 'POST',
@@ -643,11 +643,11 @@ document.getElementById('analyzeBtn').addEventListener('click', () => {
             };
         });
 
-        // Safety timeout: force-hide overlay after 25s to prevent permanent hang
+        // Safety timeout: force-hide overlay after 55s to prevent permanent hang
         _loadingSafetyTimeout = setTimeout(() => {
             console.warn('[PitchIQ] Safety timeout — forcing overlay hide.');
             hideLoadingSequence();
-        }, 25000);
+        }, 55000);
 
         // Wait for backend response (telemetry + counter run throughout)
         const data = await fetchPromise;
@@ -757,16 +757,16 @@ document.getElementById('analyzeBtn').addEventListener('click', () => {
         if (vr) {
             document.getElementById('venueReportPanel').style.display = 'block';
             document.getElementById('vrGround').textContent = vr.groundName || payload.venueName;
-            document.getElementById('vrCity').textContent = vr.city || '-';
-            document.getElementById('vrPitchType').textContent = vr.pitchType || '-';
-            document.getElementById('vrAvg1st').textContent = vr.averageFirstInningsScore || '-';
-            document.getElementById('vrBatting').textContent = vr.battingRating || '-';
-            document.getElementById('vrBowling').textContent = vr.bowlingRating || '-';
-            document.getElementById('vrPace').textContent = vr.paceSupport || '-';
-            document.getElementById('vrSpin').textContent = vr.spinSupport || '-';
-            document.getElementById('vrToss').textContent = vr.tossAdvantage || '-';
-            document.getElementById('vrDew').textContent = vr.dewFactor || '-';
-            document.getElementById('vrVerdict').textContent = vr.recommendedStrategy || vr.shortSummary || '-';
+            document.getElementById('vrCity').textContent = vr.city || 'Unavailable';
+            document.getElementById('vrPitchType').textContent = vr.pitchType || 'Unavailable';
+            document.getElementById('vrAvg1st').textContent = vr.averageFirstInningsScore || 'Unavailable';
+            document.getElementById('vrBatting').textContent = vr.battingRating || 'Unavailable';
+            document.getElementById('vrBowling').textContent = vr.bowlingRating || 'Unavailable';
+            document.getElementById('vrPace').textContent = vr.paceSupport || 'Unavailable';
+            document.getElementById('vrSpin').textContent = vr.spinSupport || 'Unavailable';
+            document.getElementById('vrToss').textContent = vr.tossAdvantage || 'Unavailable';
+            document.getElementById('vrDew').textContent = vr.dewFactor || 'Unavailable';
+            document.getElementById('vrVerdict').textContent = vr.recommendedStrategy || vr.shortSummary || 'Unavailable';
         } else {
             document.getElementById('venueReportPanel').style.display = 'none';
         }

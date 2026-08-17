@@ -52,7 +52,7 @@ public class GeminiAiCommentaryProvider implements AiCommentaryProvider {
     public GeminiAiCommentaryProvider() {
         SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
         factory.setConnectTimeout(5000); // 5 seconds
-        factory.setReadTimeout(15000); // 15 seconds
+        factory.setReadTimeout(45000);   // 45 seconds
         this.restTemplate = new RestTemplate(factory);
     }
 

@@ -31,7 +31,7 @@ public class AskPiService {
     public AskPiService() {
         org.springframework.http.client.SimpleClientHttpRequestFactory factory = new org.springframework.http.client.SimpleClientHttpRequestFactory();
         factory.setConnectTimeout(5000);
-        factory.setReadTimeout(15000);
+        factory.setReadTimeout(45000);
         this.restTemplate = new RestTemplate(factory);
     }
 

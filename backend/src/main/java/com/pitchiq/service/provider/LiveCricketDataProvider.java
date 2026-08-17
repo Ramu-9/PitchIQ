@@ -233,16 +233,16 @@ public class LiveCricketDataProvider implements CricketDataProvider {
                         return t2.compareTo(t1); // Descending time (newest result first)
                     }
                 } else {
-                    // UPCOMING: Prioritize actual start-time proximity first, followed by competition importance, team, stage, format
+                    // UPCOMING: Prioritize quality first, then start-time proximity
+                    if (q1 != q2) {
+                        return Integer.compare(q2, q1); // Descending quality
+                    }
                     if (t1 != null && t2 != null && !t1.equals(t2)) {
                         return t1.compareTo(t2); // Ascending time (earliest / most imminent start first)
                     } else if (t1 != null && t2 == null) {
                         return -1;
                     } else if (t1 == null && t2 != null) {
                         return 1;
-                    }
-                    if (q1 != q2) {
-                        return Integer.compare(q2, q1); // Descending quality for same start time
                     }
                 }
                 
