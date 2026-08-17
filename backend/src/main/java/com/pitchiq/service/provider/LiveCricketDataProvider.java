@@ -203,39 +203,43 @@ public class LiveCricketDataProvider implements CricketDataProvider {
                     return Integer.compare(state2, state1); // Descending (higher score first: LIVE(3) > RECENT(2) > UPCOMING(1))
                 }
                 
+                int team1 = calculateTeamScore(m1);
+                int team2 = calculateTeamScore(m2);
+                
+                if (team1 != team2) {
+                    return Integer.compare(team2, team1); // PRIMARY ORDER: TEAM IMPORTANCE
+                }
+                
                 LocalDateTime t1 = parseMatchTime(m1.getDateTimeGMT());
                 LocalDateTime t2 = parseMatchTime(m2.getDateTimeGMT());
-                int q1 = calculateQualityScore(m1);
-                int q2 = calculateQualityScore(m2);
                 
+                // SECONDARY ORDER: DATE/TIME (based on state)
                 if (state1 == 3) {
-                    // LIVE: Competition importance as primary intra-state factor, followed by team, stage, format, then time
-                    if (q1 != q2) {
-                        return Integer.compare(q2, q1); // Descending quality
-                    }
+                    // LIVE: most recently started
                     if (t1 != null && t2 != null && !t1.equals(t2)) {
-                        return t2.compareTo(t1); // Descending time (most recently started)
+                        return t2.compareTo(t1); 
                     }
                 } else if (state1 == 2) {
-                    // RECENT: Prioritize competition importance and then newest completion time
-                    if (q1 != q2) {
-                        return Integer.compare(q2, q1); // Descending quality
-                    }
+                    // RECENT: newest completion time
                     if (t1 != null && t2 != null && !t1.equals(t2)) {
-                        return t2.compareTo(t1); // Descending time (newest result first)
+                        return t2.compareTo(t1); 
                     }
                 } else {
-                    // UPCOMING: Prioritize quality first, then start-time proximity
-                    if (q1 != q2) {
-                        return Integer.compare(q2, q1); // Descending quality
-                    }
+                    // UPCOMING: earliest start first
                     if (t1 != null && t2 != null && !t1.equals(t2)) {
-                        return t1.compareTo(t2); // Ascending time (earliest / most imminent start first)
+                        return t1.compareTo(t2); 
                     } else if (t1 != null && t2 == null) {
                         return -1;
                     } else if (t1 == null && t2 != null) {
                         return 1;
                     }
+                }
+                
+                // ALL OTHER TIEBREAKERS (Competition, Stage, Format)
+                int tie1 = calculateCompetitionScore(m1) + calculateStageScore(m1) + calculateFormatScore(m1);
+                int tie2 = calculateCompetitionScore(m2) + calculateStageScore(m2) + calculateFormatScore(m2);
+                if (tie1 != tie2) {
+                    return Integer.compare(tie2, tie1);
                 }
                 
                 // Deterministic fallback (guarantees stable sorting)
@@ -280,14 +284,25 @@ public class LiveCricketDataProvider implements CricketDataProvider {
         }
     }
 
-    private static final java.util.Set<String> FULL_MEMBERS = java.util.Set.of(
-        "IND", "AUS", "ENG", "SA", "NZ", "PAK", "SL", "BAN", "WI", "AFG", "IRE", "ZIM",
-        "IND-W", "AUS-W", "ENG-W", "SA-W", "NZ-W", "PAK-W", "SL-W", "BAN-W", "WI-W", "AFG-W", "IRE-W", "ZIM-W"
+    private static final java.util.Set<String> TIER_3_TEAMS = java.util.Set.of(
+        // International
+        "IND", "AUS", "ENG", "IND-W", "AUS-W", "ENG-W",
+        // Franchise
+        "CSK", "RCB", "MI", "CHENNAI SUPER KINGS", "ROYAL CHALLENGERS BENGALURU", "MUMBAI INDIANS"
     );
 
-    private static final java.util.Set<String> WC_ASSOCIATES = java.util.Set.of(
-        "USA", "SCO", "NED", "NAM", "NEP", "OMA", "UAE", "PNG", "CAN", "UGA", "KEN", "THA",
-        "USA-W", "SCO-W", "NED-W", "NAM-W", "NEP-W", "OMA-W", "UAE-W", "PNG-W", "CAN-W", "UGA-W", "KEN-W", "THA-W"
+    private static final java.util.Set<String> TIER_2_TEAMS = java.util.Set.of(
+        // International
+        "SA", "NZ", "PAK", "SL", "BAN", "WI", "SA-W", "NZ-W", "PAK-W", "SL-W", "BAN-W", "WI-W",
+        // Franchise
+        "KKR", "SRH", "DC", "RR", "GT", "PBKS", "LSG",
+        "KOLKATA KNIGHT RIDERS", "SUNRISERS HYDERABAD", "DELHI CAPITALS", "RAJASTHAN ROYALS", "GUJARAT TITANS", "PUNJAB KINGS", "LUCKNOW SUPER GIANTS"
+    );
+
+    private static final java.util.Set<String> TIER_1_TEAMS = java.util.Set.of(
+        // International
+        "AFG", "IRE", "ZIM", "USA", "SCO", "NED", "NAM", "NEP", "UAE", "OMA", "PNG", "CAN", "UGA", "KEN", "THA",
+        "AFG-W", "IRE-W", "ZIM-W", "USA-W", "SCO-W", "NED-W", "NAM-W", "NEP-W", "UAE-W", "OMA-W", "PNG-W", "CAN-W", "UGA-W", "KEN-W", "THA-W"
     );
 
     public int calculateQualityScore(MatchDto match) {
@@ -360,24 +375,15 @@ public class LiveCricketDataProvider implements CricketDataProvider {
 
     public int getTeamTier(String shortName, String fullName) {
         String s = (shortName != null ? shortName : "").toUpperCase().trim();
-        if (FULL_MEMBERS.contains(s)) {
-            return 2; // Full Member
+        String f = (fullName != null ? fullName : "").toUpperCase().trim();
+        
+        if (TIER_3_TEAMS.contains(s) || TIER_3_TEAMS.contains(f) || f.contains("INDIA") || f.contains("AUSTRALIA") || f.contains("ENGLAND")) {
+            return 3;
         }
-        if (WC_ASSOCIATES.contains(s)) {
-            return 1; // World Cup Associate
-        }
-
-        String f = (fullName != null ? fullName : "").toLowerCase().trim();
-        if (f.contains("india") || f.contains("australia") || f.contains("england") ||
-            f.contains("south africa") || f.contains("new zealand") || f.contains("pakistan") ||
-            f.contains("sri lanka") || f.contains("bangladesh") || f.contains("west indies") ||
-            f.contains("afghanistan") || f.contains("ireland") || f.contains("zimbabwe")) {
+        if (TIER_2_TEAMS.contains(s) || TIER_2_TEAMS.contains(f) || f.contains("SOUTH AFRICA") || f.contains("NEW ZEALAND") || f.contains("PAKISTAN") || f.contains("SRI LANKA") || f.contains("BANGLADESH") || f.contains("WEST INDIES")) {
             return 2;
         }
-        if (f.contains("united states") || f.contains("scotland") || f.contains("netherlands") ||
-            f.contains("namibia") || f.contains("nepal") || f.contains("oman") ||
-            f.contains("emirates") || f.contains("papua new guinea") || f.contains("canada") ||
-            f.contains("uganda") || f.contains("kenya") || f.contains("thailand")) {
+        if (TIER_1_TEAMS.contains(s) || TIER_1_TEAMS.contains(f) || f.contains("AFGHANISTAN") || f.contains("IRELAND") || f.contains("ZIMBABWE") || f.contains("UNITED STATES") || f.contains("SCOTLAND") || f.contains("NETHERLANDS") || f.contains("NAMIBIA") || f.contains("NEPAL") || f.contains("OMAN") || f.contains("EMIRATES") || f.contains("PAPUA NEW GUINEA") || f.contains("CANADA") || f.contains("UGANDA") || f.contains("KENYA") || f.contains("THAILAND")) {
             return 1;
         }
         return 0;
@@ -386,17 +392,7 @@ public class LiveCricketDataProvider implements CricketDataProvider {
     public int calculateTeamScore(MatchDto match) {
         int t1Tier = getTeamTier(match.getBattingTeamShort(), match.getBattingTeam());
         int t2Tier = getTeamTier(match.getBowlingTeamShort(), match.getBowlingTeam());
-
-        if (t1Tier == 2 && t2Tier == 2) {
-            return 80; // Two Full Members
-        } else if ((t1Tier == 2 && t2Tier == 1) || (t1Tier == 1 && t2Tier == 2)) {
-            return 50; // Full Member vs WC Associate
-        } else if (t1Tier == 1 && t2Tier == 1) {
-            return 35; // Two WC Associates
-        } else if (t1Tier > 0 || t2Tier > 0) {
-            return 20; // One Full Member / Associate vs other
-        }
-        return 0;
+        return (t1Tier + t2Tier) * 10000;
     }
 
     public int calculateStageScore(MatchDto match) {

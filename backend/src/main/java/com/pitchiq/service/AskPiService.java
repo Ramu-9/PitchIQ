@@ -80,6 +80,8 @@ public class AskPiService {
             // Set generation config
             Map<String, Object> generationConfig = new HashMap<>();
             generationConfig.put("temperature", 0.7);
+            generationConfig.put("candidateCount", 1);
+            generationConfig.put("maxOutputTokens", 250);
             payload.put("generationConfig", generationConfig);
 
             HttpHeaders headers = new HttpHeaders();

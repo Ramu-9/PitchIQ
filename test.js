@@ -1,0 +1,1 @@
+﻿const fs = require('fs'); const data = JSON.parse(fs.readFileSync('live_matches.json')); console.log('Total matches: ' + data.length); data.slice(0, 30).forEach(m => console.log('[' + (m.matchStarted ? (m.matchEnded ? 'RECENT' : 'LIVE') : 'UPCOMING') + '] ' + m.name + ' (' + m.dateTimeGMT + ')'));

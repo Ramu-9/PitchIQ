@@ -117,7 +117,7 @@ class LiveCricketDataProviderTest {
     }
 
     @Test
-    void testCompetitionContextDominatesTeamPopularity() {
+    void testTeamPopularityDominatesCompetitionContext() {
         // World Cup match with two Associate teams (NED vs NEP)
         MatchDto wcAssociate = new MatchDto();
         wcAssociate.setName("Netherlands vs Nepal, Group D, ICC Men's T20 World Cup, 2026");
@@ -136,18 +136,16 @@ class LiveCricketDataProviderTest {
         bilateralFull.setBowlingTeamShort("ZIM");
         bilateralFull.setMatchType("T20");
 
-        int qWc = provider.calculateQualityScore(wcAssociate);
-        int qBilateral = provider.calculateQualityScore(bilateralFull);
+        int qWc = provider.calculateTeamScore(wcAssociate);
+        int qBilateral = provider.calculateTeamScore(bilateralFull);
 
-        assertTrue(qWc > qBilateral, 
-            "World Cup match (NED vs NEP: " + qWc + ") must outrank Bilateral match (IND vs ZIM: " + qBilateral + ")");
-        assertTrue(qWc >= 5000 && qWc < 6000, "World Cup match must stay strictly within Tier 1 bracket");
-        assertTrue(qBilateral >= 3000 && qBilateral < 4000, "Bilateral match must stay strictly within Tier 3 bracket");
+        assertTrue(qBilateral > qWc, 
+            "Bilateral match (IND vs ZIM: " + qBilateral + ") must outrank World Cup match (NED vs NEP: " + qWc + ")");
     }
 
     @Test
     void testMajorFranchise_DominatesBilateralAssociate() {
-        // Premier Franchise match (CSK vs RCB)
+        // Premier Franchise match (CSK vs RCB) - Tier 3 vs Tier 3 = 60,000 pts
         MatchDto iplMatch = new MatchDto();
         iplMatch.setName("Chennai Super Kings vs Royal Challengers Bengaluru, Qualifier 1, Indian Premier League 2026");
         iplMatch.setBattingTeam("Chennai Super Kings");
@@ -156,7 +154,7 @@ class LiveCricketDataProviderTest {
         iplMatch.setBowlingTeamShort("RCB");
         iplMatch.setMatchType("T20");
 
-        // Bilateral Associate match (SCO vs NAM)
+        // Bilateral Associate match (SCO vs NAM) - Tier 1 vs Tier 1 = 20,000 pts
         MatchDto associateBilateral = new MatchDto();
         associateBilateral.setName("Scotland vs Namibia, 2nd T20I, Namibia tour of Scotland, 2026");
         associateBilateral.setBattingTeam("Scotland");
@@ -165,8 +163,8 @@ class LiveCricketDataProviderTest {
         associateBilateral.setBowlingTeamShort("NAM");
         associateBilateral.setMatchType("T20");
 
-        int qIpl = provider.calculateQualityScore(iplMatch);
-        int qAssociate = provider.calculateQualityScore(associateBilateral);
+        int qIpl = provider.calculateTeamScore(iplMatch);
+        int qAssociate = provider.calculateTeamScore(associateBilateral);
 
         assertTrue(qIpl > qAssociate, 
             "IPL match (" + qIpl + ") must outrank Bilateral Associate match (" + qAssociate + ")");
