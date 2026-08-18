@@ -203,26 +203,27 @@ public class LiveCricketDataProvider implements CricketDataProvider {
                     return Integer.compare(state2, state1); // Descending (higher score first: LIVE(3) > RECENT(2) > UPCOMING(1))
                 }
                 
-                int team1 = calculateTeamScore(m1);
-                int team2 = calculateTeamScore(m2);
-                
-                if (team1 != team2) {
-                    return Integer.compare(team2, team1); // PRIMARY ORDER: TEAM IMPORTANCE
-                }
-                
                 LocalDateTime t1 = parseMatchTime(m1.getDateTimeGMT());
                 LocalDateTime t2 = parseMatchTime(m2.getDateTimeGMT());
                 
-                // SECONDARY ORDER: DATE/TIME (based on state)
+                // PRIMARY ORDER: DATE/TIME
                 if (state1 == 3) {
-                    // LIVE: most recently started
+                    // LIVE: most recently started first
                     if (t1 != null && t2 != null && !t1.equals(t2)) {
                         return t2.compareTo(t1); 
+                    } else if (t1 != null && t2 == null) {
+                        return -1;
+                    } else if (t1 == null && t2 != null) {
+                        return 1;
                     }
                 } else if (state1 == 2) {
-                    // RECENT: newest completion time
+                    // RECENT: newest completion time / date time, newest first
                     if (t1 != null && t2 != null && !t1.equals(t2)) {
                         return t2.compareTo(t1); 
+                    } else if (t1 != null && t2 == null) {
+                        return -1;
+                    } else if (t1 == null && t2 != null) {
+                        return 1;
                     }
                 } else {
                     // UPCOMING: earliest start first
@@ -233,6 +234,13 @@ public class LiveCricketDataProvider implements CricketDataProvider {
                     } else if (t1 == null && t2 != null) {
                         return 1;
                     }
+                }
+                
+                // SECONDARY TIEBREAKER: Team Importance
+                int team1 = calculateTeamScore(m1);
+                int team2 = calculateTeamScore(m2);
+                if (team1 != team2) {
+                    return Integer.compare(team2, team1); 
                 }
                 
                 // ALL OTHER TIEBREAKERS (Competition, Stage, Format)
@@ -286,14 +294,14 @@ public class LiveCricketDataProvider implements CricketDataProvider {
 
     private static final java.util.Set<String> TIER_3_TEAMS = java.util.Set.of(
         // International
-        "IND", "AUS", "ENG", "IND-W", "AUS-W", "ENG-W",
+        "IND", "AUS", "ENG", "IND W", "AUS W", "ENG W", "IND-W", "AUS-W", "ENG-W",
         // Franchise
         "CSK", "RCB", "MI", "CHENNAI SUPER KINGS", "ROYAL CHALLENGERS BENGALURU", "MUMBAI INDIANS"
     );
 
     private static final java.util.Set<String> TIER_2_TEAMS = java.util.Set.of(
         // International
-        "SA", "NZ", "PAK", "SL", "BAN", "WI", "SA-W", "NZ-W", "PAK-W", "SL-W", "BAN-W", "WI-W",
+        "SA", "NZ", "PAK", "SL", "BAN", "WI", "SA W", "NZ W", "PAK W", "SL W", "BAN W", "WI W", "SA-W", "NZ-W", "PAK-W", "SL-W", "BAN-W", "WI-W",
         // Franchise
         "KKR", "SRH", "DC", "RR", "GT", "PBKS", "LSG",
         "KOLKATA KNIGHT RIDERS", "SUNRISERS HYDERABAD", "DELHI CAPITALS", "RAJASTHAN ROYALS", "GUJARAT TITANS", "PUNJAB KINGS", "LUCKNOW SUPER GIANTS"
@@ -302,6 +310,7 @@ public class LiveCricketDataProvider implements CricketDataProvider {
     private static final java.util.Set<String> TIER_1_TEAMS = java.util.Set.of(
         // International
         "AFG", "IRE", "ZIM", "USA", "SCO", "NED", "NAM", "NEP", "UAE", "OMA", "PNG", "CAN", "UGA", "KEN", "THA",
+        "AFG W", "IRE W", "ZIM W", "USA W", "SCO W", "NED W", "NAM W", "NEP W", "UAE W", "OMA W", "PNG W", "CAN W", "UGA W", "KEN W", "THA W",
         "AFG-W", "IRE-W", "ZIM-W", "USA-W", "SCO-W", "NED-W", "NAM-W", "NEP-W", "UAE-W", "OMA-W", "PNG-W", "CAN-W", "UGA-W", "KEN-W", "THA-W"
     );
 
@@ -733,6 +742,10 @@ public class LiveCricketDataProvider implements CricketDataProvider {
         
         String abbr = getIccAbbreviation(fullTeamName);
         
+        if (abbr == null && providedShortName != null && !providedShortName.trim().isEmpty()) {
+            abbr = getIccAbbreviation(providedShortName);
+        }
+        
         if (abbr == null) {
             if (providedShortName != null && !providedShortName.trim().isEmpty()) {
                 abbr = providedShortName.trim().toUpperCase();
@@ -756,8 +769,8 @@ public class LiveCricketDataProvider implements CricketDataProvider {
             if (abbr.length() == 4 && abbr.toUpperCase().endsWith("W")) {
                 abbr = abbr.substring(0, 3);
             }
-            if (!abbr.endsWith("-W")) {
-                abbr += "-W";
+            if (!abbr.endsWith(" w")) {
+                abbr += " w";
             }
         }
         
@@ -769,26 +782,26 @@ public class LiveCricketDataProvider implements CricketDataProvider {
         String baseName = teamName.replaceAll("(?i)\\b(Women|W)\\b", "").trim().toLowerCase();
         
         switch (baseName) {
-            case "india": return "IND";
-            case "australia": return "AUS";
-            case "england": return "ENG";
-            case "new zealand": return "NZ";
-            case "south africa": return "SA";
-            case "pakistan": return "PAK";
-            case "bangladesh": return "BAN";
-            case "sri lanka": return "SL";
-            case "west indies": return "WI";
-            case "afghanistan": return "AFG";
-            case "ireland": return "IRE";
-            case "zimbabwe": return "ZIM";
-            case "scotland": return "SCO";
-            case "netherlands": return "NED";
+            case "india": case "ind": case "in": return "IND";
+            case "australia": case "aus": case "au": return "AUS";
+            case "england": case "eng": case "en": return "ENG";
+            case "new zealand": case "nz": case "nzl": return "NZ";
+            case "south africa": case "sa": case "rsa": return "SA";
+            case "pakistan": case "pak": case "pk": return "PAK";
+            case "bangladesh": case "ban": case "bd": return "BAN";
+            case "sri lanka": case "sl": case "slk": return "SL";
+            case "west indies": case "wi": case "win": return "WI";
+            case "afghanistan": case "afg": return "AFG";
+            case "ireland": case "ire": case "irl": return "IRE";
+            case "zimbabwe": case "zim": case "zw": return "ZIM";
+            case "scotland": case "sco": return "SCO";
+            case "netherlands": case "ned": case "nl": return "NED";
             case "united arab emirates": case "uae": return "UAE";
-            case "namibia": return "NAM";
-            case "nepal": return "NEP";
-            case "oman": return "OMA";
+            case "namibia": case "nam": return "NAM";
+            case "nepal": case "nep": return "NEP";
+            case "oman": case "oma": return "OMA";
             case "papua new guinea": case "png": return "PNG";
-            case "united states": case "usa": case "united states of america": return "USA";
+            case "united states": case "usa": case "us": case "united states of america": return "USA";
             default: return null;
         }
     }

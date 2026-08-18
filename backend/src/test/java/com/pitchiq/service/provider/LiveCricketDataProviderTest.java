@@ -58,7 +58,7 @@ class LiveCricketDataProviderTest {
     void testCalculateStateScore_TerminalMatchTreatedAsRecentNotLive() {
         MatchDto match = new MatchDto();
         match.setId("tan-uga-test");
-        match.setName("TAN-W vs UGA-W");
+        match.setName("TAN w vs UGA w");
         match.setStatus("Tanzania Women awarded the match (opposition refused to play)");
         match.setMatchStarted(true);
         match.setMatchEnded(false); // Even if provider returned matchEnded false!
@@ -372,5 +372,23 @@ class LiveCricketDataProviderTest {
         assertEquals("rec-ipl-final", list.get(0).getId(), "IPL Final (Tier 2 + Final) should rank first in recent");
         assertEquals("rec-ipl-group", list.get(1).getId(), "IPL Group (Tier 2) should rank second in recent");
         assertEquals("rec-bilateral", list.get(2).getId(), "Bilateral (Tier 3) should rank third in recent");
+    }
+
+    @Test
+    void testTeamAbbreviations() throws Exception {
+        java.lang.reflect.Method method = LiveCricketDataProvider.class.getDeclaredMethod("sanitizeAbbreviation", String.class, String.class);
+        method.setAccessible(true);
+        
+        // Men's teams
+        assertEquals("IND", method.invoke(provider, "IND", "India"));
+        assertEquals("AUS", method.invoke(provider, "AU", "Australia"));
+        assertEquals("ENG", method.invoke(provider, "", "England"));
+        assertEquals("PAK", method.invoke(provider, "PK", "Pakistan"));
+        
+        // Women's teams
+        assertEquals("IND w", method.invoke(provider, "IND-W", "India Women"));
+        assertEquals("AUS w", method.invoke(provider, "AU-W", "Australia Women"));
+        assertEquals("ENG w", method.invoke(provider, "", "England W"));
+        assertEquals("PAK w", method.invoke(provider, "PK W", "Pakistan Women"));
     }
 }
