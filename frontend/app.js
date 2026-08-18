@@ -735,10 +735,10 @@ document.getElementById('analyzeBtn').addEventListener('click', () => {
         else if (data.winProbability > 0.6 || data.winProbability < 0.4) confidence = "Medium";
         document.getElementById('headerConfidence').textContent = confidence;
         
-        let statusText = "🔴 LIVE";
-        if (payload.matchStatus === 'upcoming') statusText = "📅 UPCOMING";
-        if (payload.matchStatus === 'completed' || payload.matchStatus === 'recent') statusText = "📝 COMPLETED";
-        document.getElementById('headerMatchStatus').textContent = statusText;
+        let statusText = `<svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none" style="margin-right:2px; vertical-align:-2px;"><circle cx="12" cy="12" r="10"></circle><circle cx="12" cy="12" r="4" fill="currentColor"></circle></svg> LIVE`;
+        if (payload.matchStatus === 'upcoming') statusText = `<svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none" style="margin-right:2px; vertical-align:-2px;"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg> UPCOMING`;
+        if (payload.matchStatus === 'completed' || payload.matchStatus === 'recent') statusText = `<svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none" style="margin-right:2px; vertical-align:-2px;"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg> COMPLETED`;
+        document.getElementById('headerMatchStatus').innerHTML = statusText;
 
         // Trigger Animated Count-ups
         animateValue("winProbRing", 0, probPct, 1200, false, true); // We'll update the text in step
@@ -775,10 +775,16 @@ document.getElementById('analyzeBtn').addEventListener('click', () => {
         if (data.aiCommentary && Array.isArray(data.aiCommentary)) {
             const list = document.getElementById('intelligenceList');
             list.innerHTML = '';
-            const icons = ['📊', '🏟', '⚠', '🎯', '🧠'];
+            const icons = [
+                '<svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>', // bar-chart
+                '<svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>', // shield/venue
+                '<svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>', // alert-triangle
+                '<svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none"><circle cx="12" cy="12" r="10"></circle><circle cx="12" cy="12" r="6"></circle><circle cx="12" cy="12" r="2"></circle></svg>', // target
+                '<svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none"><path d="M9.59 4.59A2 2 0 1 1 11 8H2m10.59 11.41A2 2 0 1 0 14 16H2m15.73-8.27A2.5 2.5 0 1 1 19.5 12H2"></path><circle cx="12" cy="12" r="3"></circle></svg>' // brain
+            ];
             for (let i = 0; i < Math.min(5, data.aiCommentary.length); i++) {
                 const li = document.createElement('li');
-                li.innerHTML = `<span class="intelligence-icon">${icons[i] || '•'}</span> <span>${data.aiCommentary[i]}</span>`;
+                li.innerHTML = `<span class="intelligence-icon" style="display:inline-flex; align-items:center; justify-content:center; margin-right:8px; color:var(--accent);">${icons[i] || '•'}</span> <span>${data.aiCommentary[i]}</span>`;
                 list.appendChild(li);
             }
 
@@ -886,15 +892,15 @@ async function fetchLiveMatches() {
             const t2 = match.bowlingTeamShort || (match.bowlingTeam ? match.bowlingTeam.substring(0, 3).toUpperCase() : "T2");
             
             let section = 'live'; // 'live', 'recent', 'upcoming', 'skip'
-            let statusBadge = "🔴 LIVE";
+            let statusBadge = `<svg viewBox="0 0 24 24" width="10" height="10" stroke="currentColor" stroke-width="2" fill="none" style="margin-right:2px; vertical-align:-1px;"><circle cx="12" cy="12" r="10"></circle><circle cx="12" cy="12" r="4" fill="currentColor"></circle></svg> LIVE`;
 
             if (match.matchEnded || isTerminal) {
                 // Terminal / completed results must NEVER be displayed as LIVE
                 section = 'recent';
-                statusBadge = "📝 COMPLETED";
+                statusBadge = `<svg viewBox="0 0 24 24" width="10" height="10" stroke="currentColor" stroke-width="2" fill="none" style="margin-right:2px; vertical-align:-1px;"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg> COMPLETED`;
             } else if (match.matchStarted || isStumps) {
                 section = 'live';
-                statusBadge = "🔴 LIVE";
+                statusBadge = `<svg viewBox="0 0 24 24" width="10" height="10" stroke="currentColor" stroke-width="2" fill="none" style="margin-right:2px; vertical-align:-1px;"><circle cx="12" cy="12" r="10"></circle><circle cx="12" cy="12" r="4" fill="currentColor"></circle></svg> LIVE`;
             } else {
                 // Upcoming: Only show if scheduled start time is genuinely in the future
                 if (match.dateTimeGMT) {
@@ -908,7 +914,7 @@ async function fetchLiveMatches() {
                     } catch (e) {}
                 }
                 section = 'upcoming';
-                statusBadge = "📅 UPCOMING";
+                statusBadge = `<svg viewBox="0 0 24 24" width="10" height="10" stroke="currentColor" stroke-width="2" fill="none" style="margin-right:2px; vertical-align:-1px;"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg> UPCOMING`;
             }
             
             if (section === 'skip') return;
