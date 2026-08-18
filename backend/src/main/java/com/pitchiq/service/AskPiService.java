@@ -50,7 +50,6 @@ public class AskPiService {
             
             // System instructions
             Map<String, Object> systemContent = new HashMap<>();
-            systemContent.put("role", "system");
             systemContent.put("parts", List.of(Map.of("text", systemInstruction)));
             payload.put("system_instruction", systemContent);
 
