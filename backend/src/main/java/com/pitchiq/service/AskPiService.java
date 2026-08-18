@@ -50,8 +50,9 @@ public class AskPiService {
             
             // System instructions
             Map<String, Object> systemContent = new HashMap<>();
+            systemContent.put("role", "system");
             systemContent.put("parts", List.of(Map.of("text", systemInstruction)));
-            payload.put("systemInstruction", systemContent);
+            payload.put("system_instruction", systemContent);
 
             // History & Question
             List<Map<String, Object>> contents = new ArrayList<>();
