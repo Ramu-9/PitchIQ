@@ -104,24 +104,13 @@ public class LiveCricketDataProvider implements CricketDataProvider {
             CompletableFuture<List<MatchDto>> currentFuture0 = CompletableFuture.supplyAsync(() -> fetchAndParseListSafely("v1/currentMatches", 0));
             CompletableFuture<List<MatchDto>> currentFuture1 = CompletableFuture.supplyAsync(() -> fetchAndParseListSafely("v1/currentMatches", 25));
 
-            CompletableFuture<List<MatchDto>> upcomingFuture = CompletableFuture.supplyAsync(() -> {
-                try {
-                    return fetchAndParseCricScoreList();
-                } catch (Exception e) {
-                    log.warn("[PitchIQ] Failed to fetch cricScore: {}", e.getMessage());
-                    return Collections.emptyList();
-                }
-            });
-
             CompletableFuture<List<MatchDto>> historicalFuture0 = CompletableFuture.supplyAsync(() -> fetchAndParseListSafely("v1/matches", 0));
             CompletableFuture<List<MatchDto>> historicalFuture1 = CompletableFuture.supplyAsync(() -> fetchAndParseListSafely("v1/matches", 25));
 
-            CompletableFuture.allOf(currentFuture0, currentFuture1, upcomingFuture, historicalFuture0, historicalFuture1).join();
+            CompletableFuture.allOf(currentFuture0, currentFuture1, historicalFuture0, historicalFuture1).join();
 
             List<MatchDto> current = new ArrayList<>(currentFuture0.join());
             current.addAll(currentFuture1.join());
-            
-            List<MatchDto> upcoming = upcomingFuture.join();
             
             List<MatchDto> historical = new ArrayList<>(historicalFuture0.join());
             historical.addAll(historicalFuture1.join());
@@ -131,10 +120,7 @@ public class LiveCricketDataProvider implements CricketDataProvider {
                 matchMap.put(match.getId(), match);
             }
             
-            // 2. CricScore matches
-            for (MatchDto match : upcoming) {
-                matchMap.putIfAbsent(match.getId(), match);
-            }
+
 
             // 3. Historical matches
             for (MatchDto match : historical) {
@@ -354,83 +340,7 @@ public class LiveCricketDataProvider implements CricketDataProvider {
         return matchList;
     }
 
-    private List<MatchDto> fetchAndParseCricScoreList() throws Exception {
-        String url = baseUrl + (baseUrl.endsWith("/") ? "" : "/") + "v1/cricScore?apikey=" + apiKey;
-        
-        String maskedUrl = url.replace(apiKey != null && !apiKey.isEmpty() ? apiKey : "empty", "***");
-        log.info("[PitchIQ-Trace] Executing CricAPI CricScore Request to: {}", maskedUrl);
-        
-        ResponseEntity<String> response;
-        try {
-            response = restTemplate.exchange(url, HttpMethod.GET, null, String.class);
-            log.info("[PitchIQ-Trace] CricScore Response Code: {}", response.getStatusCode());
-        } catch (org.springframework.web.client.RestClientResponseException e) {
-            log.error("[PitchIQ-Trace] HTTP Error from CricScore: {} - {}", e.getStatusCode(), e.getResponseBodyAsString());
-            throw e;
-        } catch (Exception e) {
-            log.error("[PitchIQ-Trace] Exception before/during CricScore request: {}", e.getMessage(), e);
-            throw e;
-        }
-        
-        List<MatchDto> matchList = new ArrayList<>();
-        JsonNode root = objectMapper.readTree(response.getBody());
-        
-        if (root.has("status") && !"success".equalsIgnoreCase(root.path("status").asText())) {
-            throw new Exception("CricAPI Error: " + root.path("info").asText("Unknown"));
-        }
-        
-        JsonNode data = root.path("data");
-        
-        if (data.isArray()) {
-            for (JsonNode matchNode : data) {
-                if (matchNode == null || matchNode.isMissingNode() || !matchNode.has("id")) continue;
-                MatchDto dto = new MatchDto();
-                dto.setId(matchNode.path("id").asText());
-                String t1 = matchNode.path("t1").asText("Team A").replaceAll("\\s*\\[.*?\\]", "");
-                String t2 = matchNode.path("t2").asText("Team B").replaceAll("\\s*\\[.*?\\]", "");
-                dto.setBattingTeam(t1);
-                dto.setBowlingTeam(t2);
-                dto.setName(t1 + " vs " + t2);
-                
-                String t1s = matchNode.path("t1s").asText("").trim();
-                String t2s = matchNode.path("t2s").asText("").trim();
-                dto.setBattingTeamShort(sanitizeAbbreviation(t1s, t1));
-                dto.setBowlingTeamShort(sanitizeAbbreviation(t2s, t2));
-                
-                String dateGMT = matchNode.path("dateTimeGMT").asText("");
-                dto.setDateTimeGMT(dateGMT);
-                
-                String status = matchNode.path("status").asText("");
-                if (status.startsWith("Match starts at ") && !dateGMT.isEmpty()) {
-                    try {
-                        LocalDateTime gmtTime = LocalDateTime.parse(dateGMT);
-                        java.time.ZonedDateTime zonedDateTime = gmtTime.atZone(java.time.ZoneId.of("UTC"));
-                        java.time.ZonedDateTime istTime = zonedDateTime.withZoneSameInstant(java.time.ZoneId.of("Asia/Kolkata"));
-                        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("MMM d, h:mm a 'IST'");
-                        status = "Match starts at " + istTime.format(formatter);
-                    } catch (Exception e) {}
-                }
-                dto.setStatus(status);
-                dto.setVenue("Venue unavailable"); 
-                dto.setMatchType(matchNode.path("matchType").asText("T20").toUpperCase());
-                
-                if (isTerminalStatus(status)) {
-                    dto.setMatchStarted(true);
-                    dto.setMatchEnded(true);
-                } else if (status.startsWith("Match starts at ") || status.toLowerCase().contains("not started")) {
-                    dto.setMatchStarted(false);
-                    dto.setMatchEnded(false);
-                } else {
-                    dto.setMatchStarted(true);
-                    dto.setMatchEnded(false);
-                }
-                
-                dto.setScores(new ArrayList<>());
-                matchList.add(dto);
-            }
-        }
-        return matchList;
-    }
+
 
     private MatchDto parseSingleMatch(JsonNode matchNode) {
         if (matchNode == null || matchNode.isMissingNode() || !matchNode.has("id")) return null;
