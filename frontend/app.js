@@ -632,7 +632,7 @@ document.getElementById('analyzeBtn').addEventListener('click', () => {
             return res.json();
         }).catch(e => {
             console.warn("Fetch failed or timed out", e);
-            return { // Graceful degradation
+            return {
                 winProbability: 0,
                 projectedScore: 0,
                 expectedRunsRemaining: 0,
@@ -664,8 +664,9 @@ document.getElementById('analyzeBtn').addEventListener('click', () => {
             hideLoadingSequence();
         }, 55000);
 
-        // Wait for core simulation (very fast now)
-        const data = await fetchPromise;
+        // Orchestrate backend work to happen DURING the existing animation window
+        // Wait for both required result sets before ending the analysis sequence
+        const [data, aiData] = await Promise.all([fetchPromise, aiPromise]);
 
         // --- Backend responded — begin completion sequence ---
         _simStopTelemetry();
@@ -674,6 +675,9 @@ document.getElementById('analyzeBtn').addEventListener('click', () => {
 
         // Show completion feed line
         _simAddFeedLine("✓ Simulation converged", 'sim-feed-success');
+        if (aiData.aiCommentary && aiData.aiCommentary.length > 0 && aiData.aiCommentary[0] !== "AI intelligence temporarily unavailable.") {
+            _simAddFeedLine("✓ AI match intelligence generated", 'sim-feed-success');
+        }
         text.textContent = "ANALYSIS COMPLETE";
 
         // Stop scanner, show final counter state
@@ -748,7 +752,7 @@ document.getElementById('analyzeBtn').addEventListener('click', () => {
         document.getElementById('headerMatchStatus').innerHTML = statusText;
 
         // Trigger Animated Count-ups
-        animateValue("winProbRing", 0, probPct, 1200, false, true); // We'll update the text in step
+        animateValue("winProbRing", 0, probPct, 1200, false, true); 
         animateValue("projScoreText", 0, data.projectedScore, 1000, false, false);
         animateValue("crrText", 0, crr, 1000, true, false);
         animateValue("rrrText", 0, rrr, 1000, true, false);
@@ -759,57 +763,51 @@ document.getElementById('analyzeBtn').addEventListener('click', () => {
              document.getElementById('winProbRing').setAttribute('stroke-dasharray', `0, 100`);
         }
 
-        // Show AI Loading State
-        document.getElementById('venueReportPanel').style.display = 'block';
-        document.getElementById('vrVerdict').textContent = "Generating intelligence...";
-        const list = document.getElementById('intelligenceList');
-        list.innerHTML = '<li><span class="intelligence-icon" style="color:var(--accent);">•</span> <span>Analyzing match conditions...</span></li>';
+        // Populate Venue Report immediately with final AI data
+        const vr = aiData.venueIntelligence;
+        if (vr) {
+            document.getElementById('venueReportPanel').style.display = 'block';
+            document.getElementById('vrGround').textContent = vr.groundName || payload.venueName;
+            document.getElementById('vrCity').textContent = vr.city || 'Unavailable';
+            document.getElementById('vrPitchType').textContent = vr.pitchType || 'Unavailable';
+            document.getElementById('vrAvg1st').textContent = vr.averageFirstInningsScore || 'Unavailable';
+            document.getElementById('vrBatting').textContent = vr.battingRating || 'Unavailable';
+            document.getElementById('vrBowling').textContent = vr.bowlingRating || 'Unavailable';
+            document.getElementById('vrPace').textContent = vr.paceSupport || 'Unavailable';
+            document.getElementById('vrSpin').textContent = vr.spinSupport || 'Unavailable';
+            document.getElementById('vrToss').textContent = vr.tossAdvantage || 'Unavailable';
+            document.getElementById('vrDew').textContent = vr.dewFactor || 'Unavailable';
+            document.getElementById('vrVerdict').textContent = vr.recommendedStrategy || vr.shortSummary || 'Unavailable';
+        } else {
+            document.getElementById('venueReportPanel').style.display = 'none';
+        }
 
-        // Async resolution of AI
-        aiPromise.then(aiData => {
-            const vr = aiData.venueIntelligence;
-            if (vr) {
-                document.getElementById('venueReportPanel').style.display = 'block';
-                document.getElementById('vrGround').textContent = vr.groundName || payload.venueName;
-                document.getElementById('vrCity').textContent = vr.city || 'Unavailable';
-                document.getElementById('vrPitchType').textContent = vr.pitchType || 'Unavailable';
-                document.getElementById('vrAvg1st').textContent = vr.averageFirstInningsScore || 'Unavailable';
-                document.getElementById('vrBatting').textContent = vr.battingRating || 'Unavailable';
-                document.getElementById('vrBowling').textContent = vr.bowlingRating || 'Unavailable';
-                document.getElementById('vrPace').textContent = vr.paceSupport || 'Unavailable';
-                document.getElementById('vrSpin').textContent = vr.spinSupport || 'Unavailable';
-                document.getElementById('vrToss').textContent = vr.tossAdvantage || 'Unavailable';
-                document.getElementById('vrDew').textContent = vr.dewFactor || 'Unavailable';
-                document.getElementById('vrVerdict').textContent = vr.recommendedStrategy || vr.shortSummary || 'Unavailable';
+        // Update PitchIQ Intelligence immediately with final AI data
+        if (aiData.aiCommentary && Array.isArray(aiData.aiCommentary)) {
+            const list = document.getElementById('intelligenceList');
+            list.innerHTML = '';
+            const icons = [
+                '<svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>', 
+                '<svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>', 
+                '<svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>', 
+                '<svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none"><circle cx="12" cy="12" r="10"></circle><circle cx="12" cy="12" r="6"></circle><circle cx="12" cy="12" r="2"></circle></svg>', 
+                '<svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none"><path d="M9.59 4.59A2 2 0 1 1 11 8H2m10.59 11.41A2 2 0 1 0 14 16H2m15.73-8.27A2.5 2.5 0 1 1 19.5 12H2"></path><circle cx="12" cy="12" r="3"></circle></svg>' 
+            ];
+            for (let i = 0; i < Math.min(5, aiData.aiCommentary.length); i++) {
+                const li = document.createElement('li');
+                li.innerHTML = `<span class="intelligence-icon" style="display:inline-flex; align-items:center; justify-content:center; margin-right:8px; color:var(--accent);">${icons[i] || '•'}</span> <span>${aiData.aiCommentary[i]}</span>`;
+                list.appendChild(li);
+            }
+
+            if (aiData.aiCommentary.length > 1 && aiData.aiCommentary[1] !== "AI intelligence temporarily unavailable.") {
+                const insightDiv = document.getElementById('preMatchInsight');
+                insightDiv.style.display = 'block';
+                insightDiv.innerHTML = `<strong>Venue Insight:</strong> ${aiData.aiCommentary[1]}`;
             } else {
-                document.getElementById('venueReportPanel').style.display = 'none';
+                document.getElementById('preMatchInsight').style.display = 'none';
             }
-
-            if (aiData.aiCommentary && Array.isArray(aiData.aiCommentary)) {
-                list.innerHTML = '';
-                const icons = [
-                    '<svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>', 
-                    '<svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>', 
-                    '<svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>', 
-                    '<svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none"><circle cx="12" cy="12" r="10"></circle><circle cx="12" cy="12" r="6"></circle><circle cx="12" cy="12" r="2"></circle></svg>', 
-                    '<svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none"><path d="M9.59 4.59A2 2 0 1 1 11 8H2m10.59 11.41A2 2 0 1 0 14 16H2m15.73-8.27A2.5 2.5 0 1 1 19.5 12H2"></path><circle cx="12" cy="12" r="3"></circle></svg>' 
-                ];
-                for (let i = 0; i < Math.min(5, aiData.aiCommentary.length); i++) {
-                    const li = document.createElement('li');
-                    li.innerHTML = `<span class="intelligence-icon" style="display:inline-flex; align-items:center; justify-content:center; margin-right:8px; color:var(--accent);">${icons[i] || '•'}</span> <span>${aiData.aiCommentary[i]}</span>`;
-                    list.appendChild(li);
-                }
-
-                if (aiData.aiCommentary.length > 1 && aiData.aiCommentary[1] !== "AI intelligence temporarily unavailable.") {
-                    const insightDiv = document.getElementById('preMatchInsight');
-                    insightDiv.style.display = 'block';
-                    insightDiv.innerHTML = `<strong>Venue Insight:</strong> ${aiData.aiCommentary[1]}`;
-                } else {
-                    document.getElementById('preMatchInsight').style.display = 'none';
-                }
-                logEvent(analytics, 'generate_intelligence');
-            }
-        });
+            logEvent(analytics, 'generate_intelligence');
+        }
 
     } catch (e) {
         console.error("Simulation failed", e);
