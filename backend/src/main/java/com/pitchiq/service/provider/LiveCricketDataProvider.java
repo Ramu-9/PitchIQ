@@ -19,8 +19,10 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -29,6 +31,45 @@ import java.util.concurrent.ConcurrentHashMap;
 public class LiveCricketDataProvider implements CricketDataProvider {
 
     private static final Logger log = LoggerFactory.getLogger(LiveCricketDataProvider.class);
+
+    // ─── Big-Team Visibility Set ────────────────────────────────────────────
+    // Matches involving these teams get a visibility boost so they survive
+    // Phase A truncation. This has ZERO effect on display order (Phase B).
+    // Format (Test/ODI/T20/T20I/franchise) has ZERO priority influence.
+    private static final Set<String> BIG_TEAM_NAMES = new HashSet<>();
+    private static final Set<String> BIG_TEAM_ABBRS = new HashSet<>();
+    static {
+        // Major international teams
+        for (String t : new String[]{"india","australia","england","pakistan","south africa",
+                "new zealand","sri lanka","bangladesh","west indies","afghanistan"}) {
+            BIG_TEAM_NAMES.add(t);
+        }
+        // Major IPL franchises
+        for (String t : new String[]{"chennai super kings","royal challengers bengaluru",
+                "royal challengers bangalore","mumbai indians","kolkata knight riders",
+                "sunrisers hyderabad","delhi capitals","rajasthan royals",
+                "gujarat titans","punjab kings","lucknow super giants"}) {
+            BIG_TEAM_NAMES.add(t);
+        }
+        // Abbreviations
+        for (String a : new String[]{"ind","aus","eng","pak","sa","nz","sl","ban","wi","afg",
+                "csk","rcb","mi","kkr","srh","dc","rr","gt","pbks","lsg"}) {
+            BIG_TEAM_ABBRS.add(a);
+        }
+    }
+
+    /** Check if a team is a major team. Women's equivalents inherit priority. */
+    private static boolean isBigTeam(String fullName, String shortName) {
+        if (fullName != null) {
+            String base = fullName.replaceAll("(?i)\\b(women|woman|w)\\b", "").trim().toLowerCase();
+            if (BIG_TEAM_NAMES.contains(base)) return true;
+        }
+        if (shortName != null) {
+            String base = shortName.replaceAll("(?i)\\s*w$", "").trim().toLowerCase();
+            if (BIG_TEAM_ABBRS.contains(base)) return true;
+        }
+        return false;
+    }
 
     @Value("${cricapi.key}")
     private String apiKey;
@@ -78,6 +119,9 @@ public class LiveCricketDataProvider implements CricketDataProvider {
 
     private final Map<String, CacheEntry<MatchDto>> matchDetailsCache = new ConcurrentHashMap<>();
     private final Map<String, CacheEntry<List<MatchDto>>> liveMatchesCache = new ConcurrentHashMap<>();
+    private final Map<String, CacheEntry<List<MatchDto>>> scheduleCache = new ConcurrentHashMap<>();
+    
+    private static final long SCHEDULE_CACHE_TTL_MS = 600000; // 10 minutes
     
     private static final long LIST_CACHE_TTL_MS = 60000; // 60 seconds
     private static final long DETAILS_CACHE_TTL_MS = 45000; // 45 seconds
@@ -100,25 +144,11 @@ public class LiveCricketDataProvider implements CricketDataProvider {
 
         Map<String, MatchDto> matchMap = new java.util.LinkedHashMap<>();
         try {
-            // Step 1: Parallelize the CricAPI requests concurrently via CompletableFuture
-            // Fetch up to 100 current matches to ensure high-profile matches aren't missed on busy days
-            CompletableFuture<List<MatchDto>> currentFuture0 = CompletableFuture.supplyAsync(() -> fetchAndParseListSafely("v1/currentMatches", 0));
-            CompletableFuture<List<MatchDto>> currentFuture1 = CompletableFuture.supplyAsync(() -> fetchAndParseListSafely("v1/currentMatches", 25));
-            CompletableFuture<List<MatchDto>> currentFuture2 = CompletableFuture.supplyAsync(() -> fetchAndParseListSafely("v1/currentMatches", 50));
-            CompletableFuture<List<MatchDto>> currentFuture3 = CompletableFuture.supplyAsync(() -> fetchAndParseListSafely("v1/currentMatches", 75));
-
-            CompletableFuture<List<MatchDto>> historicalFuture0 = CompletableFuture.supplyAsync(() -> fetchAndParseListSafely("v1/matches", 0));
-            CompletableFuture<List<MatchDto>> historicalFuture1 = CompletableFuture.supplyAsync(() -> fetchAndParseListSafely("v1/matches", 25));
-
-            CompletableFuture.allOf(currentFuture0, currentFuture1, currentFuture2, currentFuture3, historicalFuture0, historicalFuture1).join();
-
-            List<MatchDto> current = new ArrayList<>(currentFuture0.join());
-            current.addAll(currentFuture1.join());
-            current.addAll(currentFuture2.join());
-            current.addAll(currentFuture3.join());
+            // 1. Fetch current matches dynamically (bounded to 6 pages = 150 matches)
+            List<MatchDto> current = fetchEndpointDynamically("v1/currentMatches", 6);
             
-            List<MatchDto> historical = new ArrayList<>(historicalFuture0.join());
-            historical.addAll(historicalFuture1.join());
+            // 2. Fetch upcoming schedule dynamically (bounded to 10 pages = 250 matches) and cache for 10m
+            List<MatchDto> historical = getScheduleMatchesDynamically("v1/matches", 10);
 
             // 1. Current matches take priority
             for (MatchDto match : current) {
@@ -144,9 +174,10 @@ public class LiveCricketDataProvider implements CricketDataProvider {
                 // If match is not started (upcoming candidate) but has no score data
                 if (!match.isMatchStarted() && (match.getScores() == null || match.getScores().isEmpty())) {
                     LocalDateTime matchTime = parseMatchTime(match.getDateTimeGMT());
-                    // Scheduled start time has already passed without match starting
-                    if (matchTime != null && matchTime.isBefore(nowUtc)) {
-                        log.warn("[PitchIQ] Filtering stale upcoming match whose start time has passed: ID={}, Name={}, Time={}", 
+                    // Scheduled start time has passed, but give it 24h before declaring it stale 
+                    // (accounts for rain delays, abandoned tosses, bad light, etc.)
+                    if (matchTime != null && matchTime.isBefore(nowUtc.minusHours(24))) {
+                        log.warn("[PitchIQ] Filtering stale upcoming match whose start time passed >24h ago: ID={}, Name={}, Time={}", 
                             match.getId(), match.getName(), match.getDateTimeGMT());
                         return true;
                     }
@@ -312,6 +343,69 @@ public class LiveCricketDataProvider implements CricketDataProvider {
         }
     }
 
+    private List<MatchDto> fetchEndpointDynamically(String endpoint, int maxPages) {
+        List<MatchDto> allMatches = new ArrayList<>();
+        try {
+            // Fetch first page to get totalRows
+            String url = baseUrl + (baseUrl.endsWith("/") ? "" : "/") + endpoint + "?apikey=" + apiKey + "&offset=0";
+            ResponseEntity<String> response = restTemplate.exchange(url, HttpMethod.GET, null, String.class);
+            com.fasterxml.jackson.databind.JsonNode root = objectMapper.readTree(response.getBody());
+            
+            if (root.has("status") && !"success".equalsIgnoreCase(root.path("status").asText())) {
+                log.error("CricAPI Error: {}", root.path("info").asText("Unknown"));
+                return allMatches;
+            }
+            
+            com.fasterxml.jackson.databind.JsonNode data = root.path("data");
+            if (data.isArray()) {
+                for (com.fasterxml.jackson.databind.JsonNode matchNode : data) {
+                    MatchDto dto = parseSingleMatch(matchNode);
+                    if (dto != null) allMatches.add(dto);
+                }
+            }
+            
+            int totalRows = root.path("info").path("totalRows").asInt(0);
+            int pageSize = 25; // standard CricAPI page size
+            
+            if (totalRows > pageSize) {
+                int totalPagesNeeded = (int) Math.ceil((double) totalRows / pageSize);
+                int pagesToFetch = Math.min(totalPagesNeeded, maxPages) - 1; // -1 because we fetched page 1
+                
+                if (pagesToFetch > 0) {
+                    List<CompletableFuture<List<MatchDto>>> futures = new ArrayList<>();
+                    for (int i = 1; i <= pagesToFetch; i++) {
+                        int currentOffset = i * pageSize;
+                        futures.add(CompletableFuture.supplyAsync(() -> fetchAndParseListSafely(endpoint, currentOffset)));
+                    }
+                    
+                    CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).join();
+                    
+                    for (CompletableFuture<List<MatchDto>> future : futures) {
+                        List<MatchDto> pageMatches = future.join();
+                        if (pageMatches != null) {
+                            allMatches.addAll(pageMatches);
+                        }
+                    }
+                }
+            }
+        } catch (Exception e) {
+            log.error("Error dynamically fetching {}: {}", endpoint, e.getMessage());
+        }
+        return allMatches;
+    }
+
+    private List<MatchDto> getScheduleMatchesDynamically(String endpoint, int maxPages) {
+        CacheEntry<List<MatchDto>> entry = scheduleCache.get("SCHEDULE_LIST");
+        if (entry != null && (System.currentTimeMillis() - entry.timestamp) < SCHEDULE_CACHE_TTL_MS) {
+            return entry.data;
+        }
+        List<MatchDto> schedule = fetchEndpointDynamically(endpoint, maxPages);
+        if (schedule != null && !schedule.isEmpty()) {
+            scheduleCache.put("SCHEDULE_LIST", new CacheEntry<>(schedule));
+        }
+        return schedule != null ? schedule : new ArrayList<>();
+    }
+
     private List<MatchDto> fetchAndParseList(String endpoint, int offset) throws Exception {
         String url = baseUrl + (baseUrl.endsWith("/") ? "" : "/") + endpoint + "?apikey=" + apiKey + "&offset=" + offset;
         
@@ -471,6 +565,11 @@ public class LiveCricketDataProvider implements CricketDataProvider {
                 visibilityScore += 5;
             }
         }
+        
+        // Big-team visibility boost (+20 per big team, max +40)
+        // This ensures major matches survive Phase A truncation.
+        if (isBigTeam(dto.getBattingTeam(), t1Short)) visibilityScore += 20;
+        if (isBigTeam(dto.getBowlingTeam(), t2Short)) visibilityScore += 20;
         
         dto.setVisibilityScore(visibilityScore);
         
