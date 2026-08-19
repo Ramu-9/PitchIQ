@@ -69,9 +69,14 @@ public class SimulationService {
         // Calculate momentum meter (0 to 1) based on current win probability
         response.setMomentumMeter(result.getWinProbability());
 
-        // 5. Enrich with Commentary
-        aiCommentaryService.enrichWithCommentary(response, request);
+        return response;
+    }
 
+    public SimulationResponse runIntelligence(MatchStateRequest request) {
+        // Run core simulation (takes < 100ms) to get the math for the AI
+        SimulationResponse response = runSimulation(request);
+        // 5. Enrich with Commentary (takes ~10s)
+        aiCommentaryService.enrichWithCommentary(response, request);
         return response;
     }
 

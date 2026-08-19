@@ -27,4 +27,14 @@ public class SimulationController {
         SimulationResponse response = simulationService.runSimulation(request);
         return ResponseEntity.ok(response);
     }
+
+    @PostMapping("/intelligence")
+    public ResponseEntity<SimulationResponse> generateIntelligence(@RequestBody MatchStateRequest request) {
+        if (request.getCurrentWickets() < 0 || request.getCurrentWickets() > 10) {
+            throw new IllegalArgumentException("Wickets must be between 0 and 10");
+        }
+        
+        SimulationResponse response = simulationService.runIntelligence(request);
+        return ResponseEntity.ok(response);
+    }
 }

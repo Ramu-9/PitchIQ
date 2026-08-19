@@ -268,9 +268,16 @@ public class GeminiAiCommentaryProvider implements AiCommentaryProvider {
         Map<String, Object> part = new HashMap<>();
         part.put("text", prompt);
         Map<String, Object> content = new HashMap<>();
+        content.put("role", "user");
         content.put("parts", List.of(part));
         Map<String, Object> payload = new HashMap<>();
         payload.put("contents", List.of(content));
+
+        Map<String, Object> generationConfig = new HashMap<>();
+        generationConfig.put("responseMimeType", "application/json");
+        // Adding conservative temperature to ensure reliable JSON and insightful commentary
+        generationConfig.put("temperature", 0.7);
+        payload.put("generationConfig", generationConfig);
 
         String requestBody = objectMapper.writeValueAsString(payload);
         HttpEntity<String> entity = new HttpEntity<>(requestBody, headers);
@@ -312,9 +319,19 @@ public class GeminiAiCommentaryProvider implements AiCommentaryProvider {
 
     private CombinedIntelligenceResult parseCombinedResponse(String cleanText) throws Exception {
         JsonNode root = objectMapper.readTree(cleanText);
-        VenueIntelligenceDto venue = objectMapper.treeToValue(root.path("venue"), VenueIntelligenceDto.class);
+        
+        JsonNode venueNode = root.path("venue");
+        if (venueNode.isMissingNode() && root.has("Venue")) {
+            venueNode = root.path("Venue");
+        }
+        VenueIntelligenceDto venue = objectMapper.treeToValue(venueNode, VenueIntelligenceDto.class);
+        
         List<String> insights = new ArrayList<>();
         JsonNode insightsNode = root.path("insights");
+        if (insightsNode.isMissingNode() && root.has("Insights")) {
+            insightsNode = root.path("Insights");
+        }
+        
         if (insightsNode.isArray()) {
             for (JsonNode n : insightsNode) {
                 String s = n.asText().trim();
@@ -333,6 +350,10 @@ public class GeminiAiCommentaryProvider implements AiCommentaryProvider {
         List<String> insights = new ArrayList<>();
         // Handle both direct array and {"insights": [...]} wrapping
         JsonNode arrayNode = root.isArray() ? root : root.path("insights");
+        if (arrayNode.isMissingNode() && root.has("Insights")) {
+            arrayNode = root.path("Insights");
+        }
+        
         if (arrayNode.isArray()) {
             for (JsonNode n : arrayNode) {
                 String s = n.asText().trim();
@@ -412,12 +433,6 @@ public class GeminiAiCommentaryProvider implements AiCommentaryProvider {
         String city = dto.getCity();
         if (city == null || city.trim().isEmpty()
                 || "N/A".equalsIgnoreCase(city.trim())) {
-            return false;
-        }
-        // Reject if average first innings score looks like a placeholder
-        String avg = dto.getAverageFirstInningsScore();
-        if (avg == null || avg.trim().isEmpty()
-                || "N/A".equalsIgnoreCase(avg.trim())) {
             return false;
         }
         return true;
