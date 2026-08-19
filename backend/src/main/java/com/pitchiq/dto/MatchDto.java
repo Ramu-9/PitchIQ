@@ -16,6 +16,7 @@ public class MatchDto {
     private String dateTimeGMT;
     private String battingTeamShort;
     private String bowlingTeamShort;
+    private int visibilityScore;
 
     // Getters and Setters
     public String getDateTimeGMT() { return dateTimeGMT; }
@@ -44,4 +45,8 @@ public class MatchDto {
     public void setMatchEnded(boolean matchEnded) { this.matchEnded = matchEnded; }
     public String getMatchType() { return matchType; }
     public void setMatchType(String matchType) { this.matchType = matchType; }
+    
+    @com.fasterxml.jackson.annotation.JsonIgnore
+    public int getVisibilityScore() { return visibilityScore; }
+    public void setVisibilityScore(int visibilityScore) { this.visibilityScore = visibilityScore; }
 }

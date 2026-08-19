@@ -101,16 +101,21 @@ public class LiveCricketDataProvider implements CricketDataProvider {
         Map<String, MatchDto> matchMap = new java.util.LinkedHashMap<>();
         try {
             // Step 1: Parallelize the CricAPI requests concurrently via CompletableFuture
+            // Fetch up to 100 current matches to ensure high-profile matches aren't missed on busy days
             CompletableFuture<List<MatchDto>> currentFuture0 = CompletableFuture.supplyAsync(() -> fetchAndParseListSafely("v1/currentMatches", 0));
             CompletableFuture<List<MatchDto>> currentFuture1 = CompletableFuture.supplyAsync(() -> fetchAndParseListSafely("v1/currentMatches", 25));
+            CompletableFuture<List<MatchDto>> currentFuture2 = CompletableFuture.supplyAsync(() -> fetchAndParseListSafely("v1/currentMatches", 50));
+            CompletableFuture<List<MatchDto>> currentFuture3 = CompletableFuture.supplyAsync(() -> fetchAndParseListSafely("v1/currentMatches", 75));
 
             CompletableFuture<List<MatchDto>> historicalFuture0 = CompletableFuture.supplyAsync(() -> fetchAndParseListSafely("v1/matches", 0));
             CompletableFuture<List<MatchDto>> historicalFuture1 = CompletableFuture.supplyAsync(() -> fetchAndParseListSafely("v1/matches", 25));
 
-            CompletableFuture.allOf(currentFuture0, currentFuture1, historicalFuture0, historicalFuture1).join();
+            CompletableFuture.allOf(currentFuture0, currentFuture1, currentFuture2, currentFuture3, historicalFuture0, historicalFuture1).join();
 
             List<MatchDto> current = new ArrayList<>(currentFuture0.join());
             current.addAll(currentFuture1.join());
+            current.addAll(currentFuture2.join());
+            current.addAll(currentFuture3.join());
             
             List<MatchDto> historical = new ArrayList<>(historicalFuture0.join());
             historical.addAll(historicalFuture1.join());
@@ -175,60 +180,63 @@ public class LiveCricketDataProvider implements CricketDataProvider {
             }
             allMatches = new ArrayList<>(uniqueMatches.values());
             
-            // Deterministic Sorting:
-            // 1. Strict State Separation: Live (3) > Recent (2) > Upcoming (1)
-            // 2. State-specific intra-state ranking rules:
-            //    - LIVE: Competition & Quality first, then newest start time
-            //    - RECENT: Competition & Quality first, then newest completion time
-            //    - UPCOMING: Start-time proximity first (earliest start first), then Quality for equal slots
-            allMatches.sort((m1, m2) -> {
-                int state1 = calculateStateScore(m1);
-                int state2 = calculateStateScore(m2);
-                
-                if (state1 != state2) {
-                    return Integer.compare(state2, state1); // Descending (higher score first: LIVE(3) > RECENT(2) > UPCOMING(1))
-                }
-                
+            // --- Phase A: Visibility Selection ---
+            List<MatchDto> liveMatches = new ArrayList<>();
+            List<MatchDto> recentMatches = new ArrayList<>();
+            List<MatchDto> upcomingMatches = new ArrayList<>();
+            
+            for (MatchDto m : allMatches) {
+                int state = calculateStateScore(m);
+                if (state == 3) liveMatches.add(m);
+                else if (state == 2) recentMatches.add(m);
+                else upcomingMatches.add(m);
+            }
+            
+            // Sort each bucket by visibilityScore DESC
+            liveMatches.sort((m1, m2) -> Integer.compare(m2.getVisibilityScore(), m1.getVisibilityScore()));
+            recentMatches.sort((m1, m2) -> Integer.compare(m2.getVisibilityScore(), m1.getVisibilityScore()));
+            upcomingMatches.sort((m1, m2) -> Integer.compare(m2.getVisibilityScore(), m1.getVisibilityScore()));
+            
+            // Truncate based on visibility limits
+            if (liveMatches.size() > 15) liveMatches = liveMatches.subList(0, 15);
+            if (recentMatches.size() > 15) recentMatches = recentMatches.subList(0, 15);
+            if (upcomingMatches.size() > 20) upcomingMatches = upcomingMatches.subList(0, 20);
+            
+            // --- Phase B: Strict Chronological Ordering ---
+            // Discard visibility score and sort strictly by actual date/time
+            
+            liveMatches.sort((m1, m2) -> {
                 LocalDateTime t1 = parseMatchTime(m1.getDateTimeGMT());
                 LocalDateTime t2 = parseMatchTime(m2.getDateTimeGMT());
-                
-                // PRIMARY ORDER: DATE/TIME
-                if (state1 == 3) {
-                    // LIVE: most recently started first
-                    if (t1 != null && t2 != null && !t1.equals(t2)) {
-                        return t2.compareTo(t1); 
-                    } else if (t1 != null && t2 == null) {
-                        return -1;
-                    } else if (t1 == null && t2 != null) {
-                        return 1;
-                    }
-                } else if (state1 == 2) {
-                    // RECENT: newest completion time / date time, newest first
-                    if (t1 != null && t2 != null && !t1.equals(t2)) {
-                        return t2.compareTo(t1); 
-                    } else if (t1 != null && t2 == null) {
-                        return -1;
-                    } else if (t1 == null && t2 != null) {
-                        return 1;
-                    }
-                } else {
-                    // UPCOMING: earliest start first
-                    if (t1 != null && t2 != null && !t1.equals(t2)) {
-                        return t1.compareTo(t2); 
-                    } else if (t1 != null && t2 == null) {
-                        return -1;
-                    } else if (t1 == null && t2 != null) {
-                        return 1;
-                    }
-                }
-                
-
-                
-                // Deterministic fallback (guarantees stable sorting)
-                String id1 = m1.getId() != null ? m1.getId() : "";
-                String id2 = m2.getId() != null ? m2.getId() : "";
-                return id1.compareTo(id2);
+                if (t1 != null && t2 != null && !t1.equals(t2)) return t2.compareTo(t1); // newest first
+                if (t1 != null) return -1;
+                if (t2 != null) return 1;
+                return m1.getId().compareTo(m2.getId());
             });
+            
+            recentMatches.sort((m1, m2) -> {
+                LocalDateTime t1 = parseMatchTime(m1.getDateTimeGMT());
+                LocalDateTime t2 = parseMatchTime(m2.getDateTimeGMT());
+                if (t1 != null && t2 != null && !t1.equals(t2)) return t2.compareTo(t1); // newest first
+                if (t1 != null) return -1;
+                if (t2 != null) return 1;
+                return m1.getId().compareTo(m2.getId());
+            });
+            
+            upcomingMatches.sort((m1, m2) -> {
+                LocalDateTime t1 = parseMatchTime(m1.getDateTimeGMT());
+                LocalDateTime t2 = parseMatchTime(m2.getDateTimeGMT());
+                if (t1 != null && t2 != null && !t1.equals(t2)) return t1.compareTo(t2); // earliest first
+                if (t1 != null) return -1;
+                if (t2 != null) return 1;
+                return m1.getId().compareTo(m2.getId());
+            });
+            
+            // Recombine
+            allMatches = new ArrayList<>();
+            allMatches.addAll(liveMatches);
+            allMatches.addAll(recentMatches);
+            allMatches.addAll(upcomingMatches);
             
             liveMatchesCache.put("LIVE_LIST", new CacheEntry<>(allMatches));
             return allMatches;
@@ -265,6 +273,8 @@ public class LiveCricketDataProvider implements CricketDataProvider {
             return 1; // UPCOMING
         }
     }
+
+
 
 
 
@@ -437,10 +447,32 @@ public class LiveCricketDataProvider implements CricketDataProvider {
         JsonNode teamInfo = matchNode.path("teamInfo");
         String t1Short = "";
         String t2Short = "";
+        int visibilityScore = 0;
+        
+        if (matchNode.path("bbbEnabled").asBoolean(false)) {
+            visibilityScore += 10;
+        }
+        if (matchNode.path("fantasyEnabled").asBoolean(false)) {
+            visibilityScore += 10;
+        }
+        if (matchNode.path("hasSquad").asBoolean(false)) {
+            visibilityScore += 5;
+        }
+
         if (teamInfo.isArray() && teamInfo.size() >= 2) {
             t1Short = teamInfo.get(0).path("shortname").asText("").trim();
             t2Short = teamInfo.get(1).path("shortname").asText("").trim();
+            if (!t1Short.isEmpty() && !t2Short.isEmpty()) {
+                visibilityScore += 5;
+            }
+            String t1Img = teamInfo.get(0).path("img").asText("").trim();
+            String t2Img = teamInfo.get(1).path("img").asText("").trim();
+            if (!t1Img.isEmpty() && !t2Img.isEmpty()) {
+                visibilityScore += 5;
+            }
         }
+        
+        dto.setVisibilityScore(visibilityScore);
         
         dto.setBattingTeamShort(sanitizeAbbreviation(t1Short, dto.getBattingTeam()));
         dto.setBowlingTeamShort(sanitizeAbbreviation(t2Short, dto.getBowlingTeam()));
