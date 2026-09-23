@@ -7,109 +7,88 @@
   <h1>🏏 PitchIQ: Where Data Meets Cricket</h1>
   <p><em>Real-Time Match Simulation, Predictive Telemetry, and Bounded AI Analytics</em></p>
   
-  <p><strong><a href="https://pitchiq-swart.vercel.app" target="_blank">🌐 View Live Demo</a></strong></p>
+  <p><strong><a href="https://pitchiq-ai.vercel.app" target="_blank">🌐 View Live Demo</a></strong></p>
 </div>
 
 ---
 
-## 🚀 The Vision
+## 👋 Hello, I'm Ramu Maddirala.
 
-**PitchIQ** is not just another sports prediction app. It is a highly optimized, production-grade telemetry engine built to demonstrate how strict software engineering principles can handle massive computational loads in real-time. 
+If you are a recruiter, hiring manager, or fellow engineer visiting this page—welcome! 
 
-Designed for scalability and performance, PitchIQ combines a pure Java **Monte Carlo simulation engine** (running 10,000 simulations per request) with a stunning **F1-inspired Glassmorphism frontend**. It proves that complex backend analytics and gorgeous frontend UX can coexist without bloated frameworks.
+I built **PitchIQ** from the ground up to showcase my ability to build **highly performant backend systems** and **gorgeous frontend user experiences**. This isn't just a basic web app; it's a full-stack, real-time sports telemetry dashboard designed to simulate the complexities of T20 Cricket.
 
-## 🧠 Why This Project Stands Out (For the Engineering Eye)
+I wanted to prove that you don't need bloated frameworks to make something beautiful, and you don't need massive servers to run complex math if you write highly optimized code. 
 
-When building PitchIQ, I focused heavily on solving real-world performance bottlenecks. If you are reviewing this repository, here is what you will find under the hood:
-
-*   **⚡ Zero-Allocation Core Engine:** Simulating 10,000 matches concurrently can crash standard JVMs due to Garbage Collection (GC) pauses. PitchIQ uses a strictly mutable `MatchState` object, driving memory allocations down to effectively **O(1)** during the tight simulation loop.
-*   **🎯 Algorithmic Efficiency:** Instead of primitive array iteration for probability weighting, the engine leverages a `NavigableMap` (TreeMap) for **O(log N)** weighted random selection, ensuring rapid and mathematically sound outcome resolution.
-*   **🛡️ Bounded "Explainable" AI:** AI hallucination is a massive risk in sports analytics. PitchIQ uses Google Gemini 1.5 Flash *only* as a strict translation layer. The LLM receives pre-calculated, deterministic analytics (Win Probability, Momentum, Expected Runs) and generates persona-driven commentary. **The AI never guesses the score; the math dictates it.**
+**Give the live demo a try:** Run a manual simulation, check out the F1-inspired telemetry charts, and chat with the "Ask PI" AI at the bottom of the page!
 
 ---
 
-## 🏗️ Clean Architecture & Code Structure
+## 🚀 What Does PitchIQ Do?
 
-The backend strictly adheres to **Clean Architecture** principles. Domain logic (the Monte Carlo engine) has zero dependencies on the Spring framework, allowing it to be tested and run in complete isolation.
+PitchIQ is a predictive analytics engine. Imagine watching a live cricket match and wanting to know the *exact* mathematical probability of who will win, based on decades of historical data, updated ball-by-ball. 
+
+PitchIQ takes real match states, runs **10,000 Monte Carlo simulations** in a fraction of a second, and translates those cold, hard numbers into dynamic, persona-driven commentary using Google Gemini AI.
+
+---
+
+## 🧠 Why I Built It This Way (The Engineering Highlights)
+
+I wanted to solve real-world engineering problems with this project. Here is how I approached them:
+
+*   **⚡ Extreme Performance (Zero-Allocation Engine):** Running 10,000 simulations concurrently can normally crash a Java application due to memory overload. I engineered a strictly mutable `MatchState` object, driving memory allocations down to effectively **O(1)** during the simulation loop. It runs lightning fast.
+*   **🎯 Algorithmic Efficiency:** Instead of looping through standard arrays, the engine leverages a `NavigableMap` (TreeMap) for **O(log N)** weighted random selection. The math is not only fast, it's structurally sound.
+*   **🛡️ "Explainable" AI Boundaries:** AI hallucination is a massive risk. I integrated Google Gemini 1.5 Flash *only* as a strict translation layer. The AI is fed pre-calculated, deterministic analytics (Win Probability, Momentum, Expected Runs). **The AI never guesses the score; my math engine dictates it.**
+*   **🏎️ The Glassmorphism UI:** I built the F1-inspired, cyberpunk dashboard using **Vanilla JavaScript, HTML, and CSS**. It features smooth transitions, interactive charts, and `tsParticles` glowing in the background, proving a deep understanding of core web technologies without relying on heavy frontend frameworks.
+
+---
+
+## 🏗️ Architecture & Code Structure
+
+I strictly adhered to **Clean Architecture**. The core simulation engine (Domain Logic) has absolutely zero dependencies on the Spring Boot framework, allowing it to be tested and run in complete isolation.
 
 ```text
 📦 pitchiq-backend
- ┣ 📂 engine/               # Domain Layer (Pure Java, zero Spring dependencies)
+ ┣ 📂 engine/               # Pure Java Domain Layer (Zero Spring dependencies)
  ┃ ┣ 📜 MonteCarloSimulator.java   # The core 10,000-iteration engine
- ┃ ┣ 📜 ProbabilityDistribution.java # O(log N) weighted randomizer
- ┃ ┗ 📜 MatchState.java            # Mutable state for zero-allocation simulation
+ ┃ ┣ 📜 ProbabilityDistribution.java # O(log N) weighted math engine
+ ┃ ┗ 📜 MatchState.java            # Mutable state for extreme performance
  ┣ 📂 entity/               # Data Layer (JPA Entities)
- ┣ 📂 repository/           # Persistence Layer (Spring Data JPA)
- ┣ 📂 service/              # Application Layer
- ┃ ┣ 📜 SimulationService.java     # Orchestrates DB -> Engine -> Frontend
- ┃ ┗ 📜 AiCommentaryService.java   # Safely bounds and formats LLM prompts
+ ┣ 📂 service/              # Application Layer (Orchestrates DB -> Engine -> UI)
  ┗ 📂 controller/           # Presentation Layer (REST APIs)
-   ┣ 📜 SimulationController.java  # Exposes the /api/v1/analyze endpoint
-   ┗ 📜 GlobalExceptionHandler.java# Ensures clean, standard JSON errors
 ```
 
 ---
 
-## 💻 Tech Stack
+## 💻 The Tech Stack
 
-### Backend
-- **Core:** Java 21, Spring Boot 3.2.4
-- **Architecture:** Clean Architecture, Domain-Driven Design (DDD)
+- **Backend:** Java 21, Spring Boot 3.2.4, Clean Architecture (DDD)
 - **Database:** MySQL (Production) / H2 (Local testing), Spring Data JPA
+- **Frontend:** Vanilla JavaScript (ES6+), CSS3 (Glassmorphism), Chart.js
 - **AI Integration:** Google Gemini 1.5 Flash REST API
-
-### Frontend
-- **Core:** Vanilla JavaScript (ES6+ Modules), HTML5, CSS3
-- **Design:** Glassmorphism UI, Responsive CSS Grid/Flexbox
-- **Visuals:** `tsParticles` (Ambient background), CSS Animations, Chart.js
-- **Auth:** Firebase Authentication (Google OAuth)
 
 ---
 
-## 🛠️ Quick Start
+## 🛠️ Quick Start (For Developers)
 
-Want to run it locally? It takes less than two minutes.
-
-### 1. Backend (The Engine)
-Ensure Java 21+ and Maven are installed. The application gracefully defaults to an in-memory **H2 Database** for immediate local testing.
+Want to run it locally? It takes less than two minutes. Ensure Java 21+ and Maven are installed.
 
 ```bash
 cd backend
 mvn spring-boot:run
 ```
-*The API spins up on `http://localhost:8080`.*
+*The API spins up on `http://localhost:8080` with an in-memory database.*
 
-### 2. Frontend (The Telemetry UI)
-Because the frontend is pure Vanilla JS, there is no massive `node_modules` folder or build step required.
-
+To view the UI, simply serve the frontend directory (no build step required!):
 ```bash
 cd frontend
-# Using Python
-python -m http.server 3000
+npx serve -p 3000
 ```
-*Open `http://localhost:3000` in your browser. Enter current match stats or click a live match, and watch the telemetry engine crunch the numbers.*
-
----
-
-## 🧪 One-Time Database Seeding (ETL)
-
-PitchIQ uses external historical cricket datasets from **Cricsheet** to calculate true probability weights. Due to size constraints, this dataset is not committed to version control.
-
-### Setup Instructions
-1. Download the T20s JSON dataset from [Cricsheet](https://cricsheet.org/downloads/t20s_json.zip).
-2. Extract the JSON files into a directory named `cricsheet_data/` at the root of this project.
-3. PitchIQ includes an isolated `CommandLineRunner` to parse these files and populate the database.
-4. Run the application with the `seed-data` profile:
-
-```bash
-cd backend
-mvn spring-boot:run -Dspring-boot.run.profiles=seed-data
-```
-*The ETL script will locate the `cricsheet_data/` directory, process the JSONs, populate the SQL tables, and safely exit the process.*
+*Open `http://localhost:3000` in your browser.*
 
 ---
 
 <div align="center">
-  <i>"Where Data Meets Cricket"</i><br>
-  Built with ❤️ by Ramu Maddirala
+  <i>"Built with Love. Driven by Passion."</i><br>
+  <strong>Designed & Developed by Ramu Maddirala</strong>
 </div>
