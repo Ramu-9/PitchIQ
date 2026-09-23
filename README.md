@@ -5,15 +5,16 @@
   <img src="https://img.shields.io/badge/AI-Gemini_1.5_Flash-blue.svg?style=for-the-badge" alt="Gemini AI">
   <h1>🏏 PitchIQ: Where Data Meets Cricket</h1>
   <p><em>Real-Time Match Simulation, Predictive Telemetry, and AI-Powered Cricket Analytics</em></p>
+  <p><strong>Live Demo: <a href="https://pitchiq-swart.vercel.app">https://pitchiq-swart.vercel.app</a></strong></p>
 </div>
 
 ---
 
 ## 🚀 Overview
 
-**PitchIQ** is a production-grade, highly optimized Monte Carlo simulation engine and analytics suite designed to provide real-time predictive insights for T20 Cricket matches. 
-1
-Built with an unapologetic focus on **Clean Architecture, O(1) memory footprint during simulations, and zero-latency performance**, PitchIQ is designed to impress engineering teams with its backend rigor and its stunning, F1-inspired telemetry frontend.
+**PitchIQ** is a Monte Carlo simulation engine and analytics suite designed to provide real-time predictive insights for T20 Cricket matches.
+
+Built with a focus on **Clean Architecture, O(1) memory footprint during simulations, and low-latency performance**, PitchIQ demonstrates backend rigor alongside a real-time telemetry frontend.
 
 Unlike typical sports predictors, PitchIQ features a strict **"Explainable AI"** boundary: The core Monte Carlo engine (pure Java) calculates raw statistical probabilities based on historical `Cricsheet` telemetry, while a tightly scoped integration with **Google Gemini 1.5 Flash** translates those cold, hard numbers into dynamic, persona-driven commentary (Analyst, Coach, or Fan) *without ever hallucinating its own predictions*.
 
@@ -21,11 +22,11 @@ Unlike typical sports predictors, PitchIQ features a strict **"Explainable AI"**
 
 ## ✨ Key Features & Engineering Highlights
 
-*   **⚡ Zero-Allocation Monte Carlo Engine:** Simulates 10,000 matches per request in milliseconds. Employs a mutable `MatchState` object to entirely eliminate Garbage Collection (GC) pauses during the simulation loop.
+*   **⚡ Zero-Allocation Monte Carlo Engine:** Simulates 10,000 matches per request efficiently. Employs a mutable `MatchState` object to minimize Garbage Collection (GC) pauses during the simulation loop.
 *   **🎯 O(log N) Weighted Random Selection:** Uses a `NavigableMap` (TreeMap) for rapid, weighted outcome resolution instead of primitive array iteration, ensuring mathematically sound probability distribution.
-*   **🧠 Bounded AI Integration:** Gemini AI is injected as a strict translation layer. The LLM receives pre-calculated analytics (Win Probability, Momentum, Expected Runs) and generates formatted insights, preventing AI hallucinations and ensuring statistical integrity.
-*   **🗄️ Resilient Free-Tier Database Architecture:** Uses a highly normalized MySQL schema accessed via Spring Data JPA. Tuned with a custom `HikariCP` connection pool configuration to aggressively manage idle timeouts and maximum lifetimes, preventing connection starvation on strict free-tier cloud databases (Aiven/TiDB).
-*   **🏎️ F1-Telemetry Dashboard:** A jaw-dropping `Glassmorphism` frontend built with plain HTML/JS/CSS. Features smooth CSS transitions, interactive SVGs, `tsParticles`, and fallback mock-data mechanisms to handle backend cold-starts gracefully.
+*   **🧠 Bounded AI Integration:** Gemini AI is injected as a translation layer. The LLM receives pre-calculated analytics (Win Probability, Momentum, Expected Runs) and generates formatted insights, anchoring responses to statistical data.
+*   **🗄️ Resilient Database Architecture:** Uses a highly normalized MySQL schema accessed via Spring Data JPA. Tuned with a custom `HikariCP` connection pool configuration to manage idle timeouts and maximum lifetimes.
+*   **🏎️ Telemetry Dashboard:** A responsive frontend built with plain HTML/JS/CSS. Features CSS transitions, interactive SVGs, `tsParticles`, and fallback mock-data mechanisms to handle backend cold-starts.
 
 ---
 
@@ -78,11 +79,15 @@ npx serve -p 3000
 
 ---
 
-## 🧪 One-Time Database Seeding (ETL)
+## 🧪 One-Time Database Seeding (ETL) & Data Setup
 
-To parse raw historical data from `Cricsheet` JSON files and seed your database with true probability weights, PitchIQ includes an isolated `CommandLineRunner`.
+PitchIQ uses external historical cricket datasets from **Cricsheet** to calculate true probability weights. Due to size constraints and repository hygiene, this dataset is not committed to version control.
 
-To prevent the ETL from running on every startup, it is sequestered behind a Spring Profile. Run the application with the `seed-data` profile:
+### Setup Instructions
+1. Download the T20s JSON dataset from [Cricsheet](https://cricsheet.org/downloads/t20s_json.zip).
+2. Extract the JSON files into a directory named `cricsheet_data/` at the root of this project. (This folder is intentionally ignored by `.gitignore`).
+3. PitchIQ includes an isolated `CommandLineRunner` to parse these files and populate the database.
+4. Run the application with the `seed-data` profile:
 
 ```bash
 mvn spring-boot:run -Dspring-boot.run.profiles=seed-data

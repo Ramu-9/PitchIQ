@@ -56,11 +56,13 @@ public class AskPiService {
             // History & Question
             List<Map<String, Object>> contents = new ArrayList<>();
             if (request.getHistory() != null) {
-                for (AskPiRequest.Message msg : request.getHistory()) {
+                int historySize = request.getHistory().size();
+                int startIndex = Math.max(0, historySize - 4); // Keep only last 2 turns to reduce latency
+                for (int i = startIndex; i < historySize; i++) {
+                    AskPiRequest.Message msg = request.getHistory().get(i);
                     Map<String, Object> part = new HashMap<>();
                     part.put("text", msg.getContent());
                     Map<String, Object> contentMap = new HashMap<>();
-                    // Gemini uses "user" and "model" roles
                     contentMap.put("role", "assistant".equals(msg.getRole()) ? "model" : "user");
                     contentMap.put("parts", List.of(part));
                     contents.add(contentMap);
@@ -81,7 +83,7 @@ public class AskPiService {
             Map<String, Object> generationConfig = new HashMap<>();
             generationConfig.put("temperature", 0.7);
             generationConfig.put("candidateCount", 1);
-            generationConfig.put("maxOutputTokens", 250);
+            generationConfig.put("maxOutputTokens", 150);
             payload.put("generationConfig", generationConfig);
 
             HttpHeaders headers = new HttpHeaders();
