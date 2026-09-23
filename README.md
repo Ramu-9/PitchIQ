@@ -25,7 +25,6 @@ When building PitchIQ, I focused heavily on solving real-world performance bottl
 *   **⚡ Zero-Allocation Core Engine:** Simulating 10,000 matches concurrently can crash standard JVMs due to Garbage Collection (GC) pauses. PitchIQ uses a strictly mutable `MatchState` object, driving memory allocations down to effectively **O(1)** during the tight simulation loop.
 *   **🎯 Algorithmic Efficiency:** Instead of primitive array iteration for probability weighting, the engine leverages a `NavigableMap` (TreeMap) for **O(log N)** weighted random selection, ensuring rapid and mathematically sound outcome resolution.
 *   **🛡️ Bounded "Explainable" AI:** AI hallucination is a massive risk in sports analytics. PitchIQ uses Google Gemini 1.5 Flash *only* as a strict translation layer. The LLM receives pre-calculated, deterministic analytics (Win Probability, Momentum, Expected Runs) and generates persona-driven commentary. **The AI never guesses the score; the math dictates it.**
-*   **🗄️ Resilient Connection Pooling:** Database connection starvation on free-tier cloud databases is handled aggressively using a custom-tuned `HikariCP` configuration, strictly managing idle timeouts and maximum lifespans.
 
 ---
 
